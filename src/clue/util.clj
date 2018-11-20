@@ -30,12 +30,11 @@
     [nil nil]
     coll))
 
-; TODO define + and - for characters if possible
 (defn cop [op & cs]
   (char (apply op (map int cs))))
 
-(defn cadd [& cs]
+(defn c+ [& cs]
   (apply cop + cs))
 
-(defn cminus [& cs]
+(defn c- [& cs]
   (apply cop - cs))

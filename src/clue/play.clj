@@ -14,4 +14,5 @@
 
 (defn -main
   [& args]
+  (assert (>= (count args) 2))
   (play! (map first args)))

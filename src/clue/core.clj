@@ -132,7 +132,7 @@
   (apply + (times 2 #(inc (rand-int 6)))))
 
 ; This assumes that you can move through a space occupied by an opponent as
-; long as you don't end there. This should be double-checked.
+; long as you don't end there.
 (defn valid-move? [state destination roll]
   {:pre [(s/valid? ::state state)
          (s/valid? ::location destination)
