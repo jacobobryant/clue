@@ -1,4 +1,16 @@
-(ns clue.util)
+(ns clue.util
+  (:require [clojure.spec.alpha :as s]))
+
+(defmacro sdefn [fname arglist post-spec & body]
+  (assert even? (count arglist))
+  (let [arglist# (partition 2 arglist)]
+    (list*
+      'defn fname
+      (vec (map first arglist#))
+      {:pre (vec (map (fn [[argname argspec]]
+                        (list `s/valid? argspec argname)) arglist#))
+       :post [(list `s/valid? post-spec '%)]}
+      body)))
 
 (defn map-from
   [f xs]
@@ -38,3 +50,7 @@
 
 (defn c- [& cs]
   (apply cop - cs))
+
+(defn parse-int [s]
+  (when (re-matches #"\d+" s)
+    (Integer/parseInt s)))

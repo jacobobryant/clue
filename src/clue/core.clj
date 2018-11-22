@@ -15,14 +15,23 @@
 (def board-width (quot (inc raw-board-width) 2))
 (def player-names {\r "Miss Scarlet"
                    \y "Colonel Mustard"
-                   \b "Madame Peacock"
+                   \b "Mrs. Peacock"
                    \g "Mr. Green"
                    \p "Professor Plum"
                    \w "Mrs. White"})
 (def player-chars (set (keys player-names)))
 (def room-chars #{\0 \1 \2 \3 \4 \5 \6 \7 \8})
 (def room-print-chars #{\A \B \C \D \E \F \G \H \I})
-
+(def weapons #{"Knife" "Lead pipe" "Candlestick" "Rope" "Revolver" "Wrench"})
+(def room-names {\0 "Study"
+                 \1 "Hall"
+                 \2 "Lounge"
+                 \3 "Dining Room"
+                 \4 "Kitchen"
+                 \5 "Ballroom"
+                 \6 "Conservatory"
+                 \7 "Billiard Room"
+                 \8 "Library"})
 
 (s/def ::coordinate (s/tuple int? int?))
 (s/def ::room room-chars)
@@ -38,7 +47,23 @@
 (s/def ::board (s/map-of ::coordinate ::value))
 (s/def ::players (s/coll-of ::player))
 (s/def ::turn int?)
-(s/def ::state (s/keys :req [::player-locations ::turn]))
+(s/def ::weapon weapons)
+(s/def ::card (s/or :person ::player
+                    :weapon ::weapon
+                    :room ::room))
+(s/def ::cards (s/coll-of ::card))
+(s/def ::solution ::cards)
+(s/def ::person ::player)
+(s/def ::suggester ::player)
+(s/def ::response (s/tuple ::player ::card))
+(s/def ::suggestion (s/keys :req [::suggester ::solution]
+                            :opt [::response]))
+(s/def ::suggestions (s/coll-of ::suggestion))
+(s/def ::player-cards (s/map-of ::player ::cards))
+(s/def ::face-up-cards ::cards)
+(s/def ::state (s/keys :req [::player-locations ::player-cards
+                             ::turn ::solution ::suggestions]
+                       :opt [::face-up-cards]))
 (s/def ::roll (s/and number? #(<= 2 % 12)))
 
 
@@ -83,11 +108,19 @@
    :post [(s/valid? ::player-locations %)]}
   (map-from #(first (board-inverse %)) players))
 
+(defn get-players [state]
+  (sort (keys (::player-locations state))))
+
+(defn nth-player [state n]
+  {:pre [(s/valid? ::state state)]
+   :post [(s/valid? ::player %)]}
+  (let [players (get-players state)]
+    (nth players (mod n (count players)))))
+
 (defn current-player [state]
   {:pre [(s/valid? ::state state)]
    :post [(s/valid? ::player %)]}
-  (let [players (sort (keys (::player-locations state)))]
-    (nth players (mod (::turn state) (count players)))))
+  (nth-player state (::turn state)))
 
 (defn current-location [state]
   {:pre [(s/valid? ::state state)]
@@ -132,7 +165,8 @@
   (apply + (times 2 #(inc (rand-int 6)))))
 
 ; This assumes that you can move through a space occupied by an opponent as
-; long as you don't end there.
+; long as you don't end there, and it allows you to move fewer spaces than you
+; rolled. Needs to be updated to match official rules.
 (defn valid-move? [state destination roll]
   {:pre [(s/valid? ::state state)
          (s/valid? ::location destination)
@@ -146,3 +180,29 @@
                                    (set x))]
     (and (contains? available destination)
          (not (other-player-coordinates destination)))))
+
+(defn initial-state [players]
+  {:pre [(s/valid? ::players players)]
+   :post [(s/valid? ::state %)]}
+  (let [decks (map shuffle [player-chars weapons room-chars])
+        solution (set (map first decks))
+        deck (shuffle (mapcat rest decks))
+        n-cards-per-player (quot (count deck) (count players))
+        player-cards (->> deck
+                          (partition n-cards-per-player)
+                          (map set)
+                          (map vector players)
+                          (into {}))
+        face-up-cards (set (drop (* n-cards-per-player (count players))
+                                 deck))]
+  (cond-> {::player-locations (starting-locations players)
+           ::turn 0
+           ::player-cards player-cards
+           ::solution solution
+           ::suggestions []}
+    (seq face-up-cards) (assoc ::face-up-cards face-up-cards))))
+
+(defn name-of [card]
+  (cond-> card
+    (s/valid? ::room card) room-names
+    (s/valid? ::player card) player-names))

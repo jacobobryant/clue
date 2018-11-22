@@ -1,16 +1,14 @@
 (ns clue.play
   (:gen-class)
-  (:require [clue.core :refer [starting-locations] :as core]
-            [clue.human :refer [take-turn]]))
+  (:require [clojure.spec.alpha :as s]
+            [clue.core :refer :all :as core]
+            [clue.human :refer :all]
+            [clue.util :refer :all]))
 
 (defn play! [players]
-  (loop [state {::core/player-locations (starting-locations players)
-                ::core/turn 0}]
+  (loop [state (initial-state players)]
     (when (some? (::core/turn state))
       (recur (take-turn state)))))
-
-(def test-state {::core/player-locations (starting-locations [\r \g])
-                 ::core/turn 0})
 
 (defn -main
   [& args]
