@@ -1,16 +1,4 @@
-(ns clue.util
-  (:require [clojure.spec.alpha :as s]))
-
-(defmacro sdefn [fname arglist post-spec & body]
-  (assert even? (count arglist))
-  (let [arglist# (partition 2 arglist)]
-    (list*
-      'defn fname
-      (vec (map first arglist#))
-      {:pre (vec (map (fn [[argname argspec]]
-                        (list `s/valid? argspec argname)) arglist#))
-       :post [(list `s/valid? post-spec '%)]}
-      body)))
+(ns clue.util)
 
 (defn map-from
   [f xs]
@@ -28,9 +16,6 @@
                  (conj % k))))
     {}
     m))
-
-(defn times [n f]
-  (doall (for [_ (range n)] (f))))
 
 (defn conj-some [coll x]
   (cond-> coll

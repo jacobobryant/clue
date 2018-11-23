@@ -5,8 +5,8 @@
             [clojure.java.io :as io]
             [clojure.spec.alpha :as s]
             [clojure.set :refer [intersection union difference]]
-            [clue.util :refer [map-from dissoc-by map-inverse
-                               times conj-some]]))
+            [orchestra.core :refer [defn-spec]]
+            [clue.util :as u]))
 
 (def board (-> (slurp (io/resource "board.txt"))
                (str/split #"\n")
@@ -66,11 +66,8 @@
                        :opt [::face-up-cards]))
 (s/def ::roll (s/and number? #(<= 2 % 12)))
 
-
-(defn lookup [i j]
-  {:pre [(s/valid? ::coordinate [i j])]
-   :post [(s/valid? (s/or :some ::value
-                          :none (s/nilable #{\space})) %)]}
+(defn-spec lookup (s/or :some ::value :none (s/nilable #{\space}))
+  [i int? j int?]
   (get (nth board i) j))
 
 (def starting-board
@@ -78,9 +75,9 @@
     (let [board-map (into {} (for [i (range (count board))
                                    j (range 0 raw-board-width 2)]
                                [[i (quot j 2)] (lookup i j)]))]
-      (dissoc-by board-map #(contains? #{\space nil} (second %))))))
+      (u/dissoc-by board-map #(contains? #{\space nil} (second %))))))
 
-(def board-inverse (dissoc (map-inverse starting-board) \-))
+(def board-inverse (dissoc (u/map-inverse starting-board) \-))
 
 (defn coordinates-with [values]
   (mapcat (comp vec board-inverse) values))
@@ -103,48 +100,43 @@
 ; Like in Nacho Libre
 (def secret-tunnels {\0 \4, \4 \0, \2 \6, \6 \2})
 
-(defn starting-locations [players]
-  {:pre [(s/valid? ::players players)]
-   :post [(s/valid? ::player-locations %)]}
-  (map-from #(first (board-inverse %)) players))
+(defn-spec starting-locations ::player-locations
+  [players ::players]
+  (u/map-from #(first (board-inverse %)) players))
 
-(defn get-players [state]
+(defn-spec get-players (s/coll-of ::player)
+  [state ::state]
   (sort (keys (::player-locations state))))
 
-(defn nth-player [state n]
-  {:pre [(s/valid? ::state state)]
-   :post [(s/valid? ::player %)]}
+(defn-spec nth-player ::player
+  [state ::state n int?]
   (let [players (get-players state)]
     (nth players (mod n (count players)))))
 
-(defn current-player [state]
-  {:pre [(s/valid? ::state state)]
-   :post [(s/valid? ::player %)]}
+(defn-spec current-player ::player
+  [state ::state]
   (nth-player state (::turn state)))
 
-(defn current-location [state]
-  {:pre [(s/valid? ::state state)]
-   :post [(s/valid? ::location %)]}
+(defn-spec current-location ::location
+  [state ::state]
   (get-in state [::player-locations (current-player state)]))
 
-(defn adjacent-locations [source]
-  {:pre [(s/valid? ::coordinate source)]
-   :post [(s/valid? (s/coll-of ::location) %)]}
+(defn-spec adjacent-locations (s/coll-of ::location)
+  [source ::coordinate]
   (let [[x y] source,
         coordinates
         (intersection all-coordinates
                       #{[(inc x) y] [(dec x) y] [x (inc y)] [x (dec y)]}),
         room (room-chars (starting-board source))]
-    (conj-some coordinates room)))
+    (u/conj-some coordinates room)))
 
 ; BFS
-(defn available-locations [source roll]
-  {:pre [(s/valid? ::location source) (s/valid? ::roll roll)]
-   :post [(s/valid? (s/coll-of ::location) %)]}
+(defn-spec available-locations (s/coll-of ::location)
+  [source ::location roll ::roll]
   (let [[roll-0 visited-0]
         (if (s/valid? ::coordinate source)
           [roll #{source}]
-          [(dec roll) (conj-some (board-inverse source)
+          [(dec roll) (u/conj-some (board-inverse source)
                                  (secret-tunnels source))])]
     (loop [roll roll-0
            visited visited-0
@@ -160,18 +152,15 @@
                  (union visited next-batch)
                  next-batch))))))
 
-(defn roll-dice []
-  {:post [(s/valid? ::roll %)]}
-  (apply + (times 2 #(inc (rand-int 6)))))
+(defn-spec roll-dice ::roll
+  []
+  (apply + (repeatedly 2 #(inc (rand-int 6)))))
 
 ; This assumes that you can move through a space occupied by an opponent as
 ; long as you don't end there, and it allows you to move fewer spaces than you
 ; rolled. Needs to be updated to match official rules.
-(defn valid-move? [state destination roll]
-  {:pre [(s/valid? ::state state)
-         (s/valid? ::location destination)
-         (s/valid? ::roll roll)]
-   :post [(s/valid? boolean? %)]}
+(defn-spec valid-move? boolean?
+  [state ::state destination ::location roll ::roll]
   (let [available (available-locations (current-location state) roll)
         other-player-coordinates (as-> (::player-locations state) x
                                    (dissoc x (current-player state))
@@ -181,9 +170,8 @@
     (and (contains? available destination)
          (not (other-player-coordinates destination)))))
 
-(defn initial-state [players]
-  {:pre [(s/valid? ::players players)]
-   :post [(s/valid? ::state %)]}
+(defn-spec initial-state ::state
+  [players ::players]
   (let [decks (map shuffle [player-chars weapons room-chars])
         solution (set (map first decks))
         deck (shuffle (mapcat rest decks))
@@ -195,14 +183,15 @@
                           (into {}))
         face-up-cards (set (drop (* n-cards-per-player (count players))
                                  deck))]
-  (cond-> {::player-locations (starting-locations players)
-           ::turn 0
-           ::player-cards player-cards
-           ::solution solution
-           ::suggestions []}
-    (seq face-up-cards) (assoc ::face-up-cards face-up-cards))))
+    (cond-> {::player-locations (starting-locations players)
+             ::turn 0
+             ::player-cards player-cards
+             ::solution solution
+             ::suggestions []}
+      (seq face-up-cards) (assoc ::face-up-cards face-up-cards))))
 
-(defn name-of [card]
+(defn-spec name-of string?
+  [card ::card]
   (cond-> card
     (s/valid? ::room card) room-names
     (s/valid? ::player card) player-names))

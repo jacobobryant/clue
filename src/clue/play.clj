@@ -1,16 +1,13 @@
 (ns clue.play
   (:gen-class)
-  (:require [clojure.spec.alpha :as s]
-            [clue.core :refer :all :as core]
-            [clue.human :refer :all]
-            [clue.util :refer :all]))
-
-(defn play! [players]
-  (loop [state (initial-state players)]
-    (when (some? (::core/turn state))
-      (recur (take-turn state)))))
+  (:require [orchestra.spec.test :as st]
+            [clue.core :refer [initial-state] :as core]
+            [clue.human :refer [take-turn]]))
 
 (defn -main
   [& args]
   (assert (>= (count args) 2))
-  (play! (map first args)))
+  (st/instrument)
+  (loop [state (initial-state (map first args))]
+    (when (some? (::core/turn state))
+      (recur (take-turn state)))))
