@@ -59,11 +59,12 @@
 (s/def ::suggestion (s/keys :req [::suggester ::solution]
                             :opt [::response]))
 (s/def ::suggestions (s/coll-of ::suggestion))
-(s/def ::player-cards (s/map-of ::player ::cards))
+(s/def ::hands (s/map-of ::player ::cards))
 (s/def ::face-up-cards ::cards)
-(s/def ::state (s/keys :req [::player-locations ::player-cards
-                             ::turn ::solution ::suggestions]
-                       :opt [::face-up-cards]))
+(s/def ::accusations (s/map-of ::player ::solution))
+(s/def ::state (s/keys :req [::player-locations ::hands ::suggestions
+                             ::solution ::accusations]
+                       :opt [::face-up-cards ::turn]))
 (s/def ::roll (s/and number? #(<= 2 % 12)))
 
 (defn-spec lookup (s/or :some ::value :none (s/nilable #{\space}))
@@ -176,22 +177,33 @@
         solution (set (map first decks))
         deck (shuffle (mapcat rest decks))
         n-cards-per-player (quot (count deck) (count players))
-        player-cards (->> deck
-                          (partition n-cards-per-player)
-                          (map set)
-                          (map vector players)
-                          (into {}))
+        hands (->> deck
+                   (partition n-cards-per-player)
+                   (map set)
+                   (map vector players)
+                   (into {}))
         face-up-cards (set (drop (* n-cards-per-player (count players))
                                  deck))]
     (cond-> {::player-locations (starting-locations players)
              ::turn 0
-             ::player-cards player-cards
+             ::hands hands
              ::solution solution
-             ::suggestions []}
+             ::suggestions []
+             ::accusations {}}
       (seq face-up-cards) (assoc ::face-up-cards face-up-cards))))
 
 (defn-spec name-of string?
-  [card ::card]
-  (cond-> card
-    (s/valid? ::room card) room-names
-    (s/valid? ::player card) player-names))
+  [x any?]
+  (cond-> x
+    (s/valid? ::room x) room-names
+    (s/valid? ::player x) player-names))
+
+(defn-spec current-player-out? boolean?
+  [state ::state]
+  (contains? (::accusations state) (current-player state)))
+
+(defn-spec game-over? boolean?
+  [state ::state]
+  (or ((-> state ::accusations vals set) (::solution state))
+      (= (count (::accusations state))
+         (dec (count (get-players state))))))

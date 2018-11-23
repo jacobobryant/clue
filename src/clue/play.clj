@@ -2,27 +2,31 @@
   (:gen-class)
   (:require [orchestra.spec.test :as st]
             [orchestra.core :refer [defn-spec]]
-            [clue.core :refer [initial-state] :as c]
+            [clue.core :as c]
+            [clue.util :as u]
             [clue.human :as hu]))
 
 (defn-spec take-turn ::c/state
   [state ::c/state]
-  (let [player (c/current-player state)
-        roll (c/roll-dice)
-        destination (hu/get-move state roll)
-        make-suggestion
-        (if (c/room-chars destination)
-          #(update % ::c/suggestions conj (hu/make-suggestion %))
-          identity)]
-    (-> state
-        (assoc-in [::c/player-locations player] destination)
-        make-suggestion
-        (update ::c/turn inc))))
+  (if (c/current-player-out? state)
+    (update state ::c/turn inc)
+    (let [player (c/current-player state)
+          roll (c/roll-dice)
+          destination (hu/get-move state roll)]
+      (u/condas-> state x
+        true (assoc-in x [::c/player-locations player] destination),
+        (c/room-chars destination)
+        (update x ::c/suggestions conj (hu/make-suggestion x)),
+        (hu/accuse?)
+        (assoc-in x [::c/accusations player] (hu/make-accusation x)),
+        true (update x ::c/turn inc),
+        (c/game-over? x)
+        (dissoc x ::c/turn)))))
 
 (defn -main
   [& args]
   (assert (>= (count args) 2))
   (st/instrument)
-  (loop [state (initial-state (map first args))]
+  (loop [state (c/initial-state (map first args))]
     (when (some? (::c/turn state))
       (recur (take-turn state)))))

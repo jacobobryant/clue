@@ -40,3 +40,11 @@
 (defn parse-int [s]
   (when (re-matches #"\d+" s)
     (Integer/parseInt s)))
+
+(defmacro condas->
+  "Combination of as-> and cond->."
+  [expr name & clauses]
+  (assert (even? (count clauses)))
+  `(as-> ~expr ~name
+     ~@(map (fn [[test step]] `(if ~test ~step ~name))
+            (partition 2 clauses))))

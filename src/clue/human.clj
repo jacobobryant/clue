@@ -36,10 +36,6 @@
 
 (defn-spec print-game-board any?
   [spaces ::c/board]
-  (println "rooms: "
-           (->> c/room-chars
-                (map-indexed #(format "(%s) %s" %1 (c/name-of %2)))
-                (str/join ", ")))
   (print "   ")
   (apply println (map #(char (+ (int \a) %)) (range c/board-width)))
   (println
@@ -76,12 +72,18 @@
   (str/join ", " (map c/name-of cards)))
 
 (defn print-cards [state]
-  (->> [::c/player-cards (c/current-player state)]
+  (->> [::c/hands (c/current-player state)]
        (get-in state)
        cardstr
        (println "Your cards:"))
   (when-let [face-up-cards (get state ::c/face-up-cards)]
     (println "Face-up cards:" (cardstr face-up-cards))))
+
+(defn print-rooms []
+  (println "Rooms:"
+           (->> c/room-chars
+                (map-indexed #(format "(%s) %s" %1 (c/name-of %2)))
+                (str/join ", "))))
 
 (defn prompt [message & args]
   (apply printf message args)
@@ -93,14 +95,21 @@
 
 (defn print-state [state]
   (clear)
+  (print-rooms)
+  (print-cards state)
+  (println)
   (print-game-board
     (current-board (::c/player-locations state)))
-  (println)
-  (print-cards state)
   (println))
 
-(defn get-choice [choice-name choices]
-  (printf "Choose a %s.\n" choice-name)
+(defn-spec get-choice any?
+  {:fn #(some #{(:ret %)} (-> % :args :choices))}
+  [choice-name string? choices (s/coll-of any?)]
+  (printf "Choose %s %s.\n"
+          (if (#{\a \e \i \o \u} (first choice-name))
+            "an"
+            "a")
+          choice-name)
   (println (->> choices
                 (map-indexed #(format "(%s) %s" %1 (c/name-of %2)))
                 (str/join ", ")))
@@ -119,7 +128,7 @@
 
 (defn-spec get-response-from (s/nilable ::c/response)
   [player ::c/player state ::c/state solution ::c/solution]
-  (let [hand (get-in state [::c/player-cards player])
+  (let [hand (get-in state [::c/hands player])
         choices (intersection solution hand)
         curplayer (c/current-player state)]
     (when (not-empty choices)
@@ -141,7 +150,6 @@
     (if response
       (println (c/name-of responder) "showed you:" (c/name-of card))
       (println "No responses."))
-    (prompt "Press Enter.")
     response))
 
 ; public api
@@ -161,7 +169,6 @@
 
 (defn-spec make-suggestion ::c/suggestion
   [state ::c/state]
-  (print-state state)
   (print "Making a suggestion. ")
   (let [curplayer (c/current-player state)
         room (->> (get-in state [::c/player-locations curplayer])
@@ -175,3 +182,23 @@
        ::c/solution solution
        ::c/response response}
       nil?)))
+
+(defn-spec accuse? boolean?
+  []
+  (let [choices ["End turn" "Make an accusation"]]
+    (= (second choices) (get-choice "option" choices))))
+
+(defn-spec make-accusation ::c/solution
+  [state ::c/state]
+  (let [solution #{(get-choice "person" c/player-chars)
+                   (get-choice "weapon" c/weapons)
+                   (get-choice "room" c/room-chars)}
+        real-solution (::c/solution state)
+        state (assoc-in state [::c/accusations (c/current-player state)]
+                        solution)]
+    (if (= solution real-solution)
+      (println "Correct! You win.")
+      (println "Wrong. The correct answer was" (cardstr real-solution)))
+    (when-not (c/game-over? state)
+      (prompt "Press Enter."))
+    solution))
