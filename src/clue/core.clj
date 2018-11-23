@@ -72,10 +72,10 @@
 
 (def starting-board
   (s/assert ::board
-    (let [board-map (into {} (for [i (range (count board))
-                                   j (range 0 raw-board-width 2)]
-                               [[i (quot j 2)] (lookup i j)]))]
-      (u/dissoc-by board-map #(contains? #{\space nil} (second %))))))
+            (let [board-map (into {} (for [i (range (count board))
+                                           j (range 0 raw-board-width 2)]
+                                       [[i (quot j 2)] (lookup i j)]))]
+              (u/dissoc-by board-map #(contains? #{\space nil} (second %))))))
 
 (def board-inverse (dissoc (u/map-inverse starting-board) \-))
 
@@ -92,8 +92,8 @@
   (s/assert
     ::board
     (as-> starting-board x
-        (replace-values x player-chars \-)
-        (reduce dissoc x (coordinates-with room-print-chars)))))
+      (replace-values x player-chars \-)
+      (reduce dissoc x (coordinates-with room-print-chars)))))
 
 (def all-coordinates (set (keys starting-board)))
 
@@ -137,7 +137,7 @@
         (if (s/valid? ::coordinate source)
           [roll #{source}]
           [(dec roll) (u/conj-some (board-inverse source)
-                                 (secret-tunnels source))])]
+                                   (secret-tunnels source))])]
     (loop [roll roll-0
            visited visited-0
            current-batch visited-0]

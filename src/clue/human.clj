@@ -1,12 +1,12 @@
 (ns clue.human
-    "CLI client for human players"
-    (:require [clojure.java.shell :refer [sh]]
-              [clojure.string :as str]
-              [clojure.spec.alpha :as s]
-              [clojure.set :refer [intersection]]
-              [orchestra.core :refer [defn-spec]]
-              [clue.core :as c]
-              [clue.util :as u]))
+  "CLI client for human players"
+  (:require [clojure.java.shell :refer [sh]]
+            [clojure.string :as str]
+            [clojure.spec.alpha :as s]
+            [clojure.set :refer [intersection]]
+            [orchestra.core :refer [defn-spec]]
+            [clue.core :as c]
+            [clue.util :as u]))
 
 (def room-idx-coordinate
   (->>
@@ -14,7 +14,7 @@
           :let [room-print-char (u/c+ (u/c- room \0) \A)
                 coordinates (sort (vec (c/board-inverse room-print-char)))]
           i (range (count coordinates))]
-         [[room i] (nth coordinates i)])
+      [[room i] (nth coordinates i)])
     (into {})))
 
 (defn-spec player-coordinates-for ::c/player-coordinates
@@ -30,7 +30,7 @@
         (concat player-coordinate
                 (mapcat player-coordinates-for (u/map-inverse player-room)))]
     (reduce (fn [board [player coordinate]]
-                (assoc board coordinate player))
+              (assoc board coordinate player))
             c/empty-board
             player-coordinate)))
 
@@ -42,11 +42,11 @@
     (str/join
       "\n"
       (for [i (range (count c/board))]
-           (format "%2d %s" (inc i)
-                   (str/join
-                     " "
-                     (for [j (range c/board-width)]
-                          (str/upper-case (or (spaces [i j]) " ")))))))))
+        (format "%2d %s" (inc i)
+                (str/join
+                  " "
+                  (for [j (range c/board-width)]
+                    (str/upper-case (or (spaces [i j]) " ")))))))))
 
 (defn-spec read-location ::c/location
   []
@@ -64,19 +64,8 @@
       (= input "quit") (System/exit 0)
       parsed parsed
       :else (do
-              (println "invalid input")
+              (println "Invalid input")
               (read-location)))))
-
-(defn-spec get-move ::c/location
-  [state ::c/state roll ::c/roll]
-  (println "You rolled:" roll)
-  (loop []
-        (let [destination (read-location)]
-          (if (c/valid-move? state destination roll)
-            destination
-            (do
-              (println "Invalid move")
-              (recur))))))
 
 (defn-spec cardstr string?
   [cards ::c/cards]
@@ -88,7 +77,7 @@
        cardstr
        (println "Your cards:"))
   (when-let [face-up-cards (get state ::c/face-up-cards)]
-            (println "Face-up cards:" (cardstr face-up-cards))))
+    (println "Face-up cards:" (cardstr face-up-cards))))
 
 (defn prompt [message & args]
   (apply printf message args)
@@ -119,15 +108,6 @@
         (println "Invalid choice")
         (get-choice choice-name choices))))
 
-(defn-spec get-suggestion ::c/suggestion
-  [player ::c/player]
-  (print "Making a suggestion. ")
-  {::c/suggester player
-   ::c/solution
-   #{(get-choice "person" c/player-chars)
-     (get-choice "weapon" c/weapons)
-     (get-choice "room" c/room-chars)}})
-
 (defn-spec prompt-player any?
   [player ::c/player]
   (clear)
@@ -148,30 +128,38 @@
 
 (defn-spec get-response (s/nilable ::c/response)
   [state ::c/state solution ::c/solution]
-  (let [player (c/current-player state)
+  (let [player (c/current-player state),
         next-players (->> (c/get-players state)
                           (split-with #(not= player %))
-                          reverse flatten rest)]
-    (some #(get-response-from % state solution) next-players)))
+                          reverse flatten rest),
+        [responder card :as response]
+        (some #(get-response-from % state solution) next-players)]
+    (when response
+      (println (c/name-of responder) "showed you:" (c/name-of card))
+      (prompt "Press Enter."))
+    response))
 
-(defn-spec take-turn ::c/state
+(defn-spec get-move ::c/location
+  [state ::c/state roll ::c/roll]
+  (prompt-player (c/current-player state))
+  (print-state state)
+  (println "You rolled:" roll)
+  (loop []
+    (let [destination (read-location)]
+      (if (c/valid-move? state destination roll)
+        destination
+        (do
+          (println "Invalid move")
+          (recur))))))
+
+(defn-spec make-suggestion ::c/suggestion
   [state ::c/state]
-  (let [player (c/current-player state)]
-    (prompt-player player)
-    (print-state state)
-
-    (let [roll (c/roll-dice),
-          destination (get-move state roll),
-          state (assoc-in state [::c/player-locations player] destination),
-          _ (print-state state),
-          suggestion (get-suggestion player),
-          [responder card :as response]
-          (get-response state (::c/solution suggestion)),
-          suggestion (cond-> suggestion
-                             response (assoc ::c/response response))]
-      (when response (println (c/name-of responder) "showed you:"
-                              (c/name-of card)))
-      (prompt "Press Enter.")
-      (-> state
-          (update conj suggestion)
-          (update ::c/turn inc)))))
+  (print-state (state))
+  (print "Making a suggestion. ")
+  (let [solution #{(get-choice "person" c/player-chars)
+                   (get-choice "weapon" c/weapons)
+                   (get-choice "room" c/room-chars)}
+        response (get-response state solution)]
+    (cond-> {::c/suggester (c/current-player state)
+             ::c/solution solution}
+      response (assoc ::c/response response))))

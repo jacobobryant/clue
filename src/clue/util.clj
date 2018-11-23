@@ -27,6 +27,7 @@
     [nil nil]
     coll))
 
+; Do this with algo.generic
 (defn cop [op & cs]
   (char (apply op (map int cs))))
 
