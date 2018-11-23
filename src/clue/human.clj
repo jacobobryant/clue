@@ -36,6 +36,10 @@
 
 (defn-spec print-game-board any?
   [spaces ::c/board]
+  (println "rooms: "
+           (->> c/room-chars
+                (map-indexed #(format "(%s) %s" %1 (c/name-of %2)))
+                (str/join ", ")))
   (print "   ")
   (apply println (map #(char (+ (int \a) %)) (range c/board-width)))
   (println
@@ -118,7 +122,7 @@
   (let [hand (get-in state [::c/player-cards player])
         choices (intersection solution hand)
         curplayer (c/current-player state)]
-    (when choices
+    (when (not-empty choices)
       (prompt-player player)
       (printf "%s suggested %s.\n" (c/name-of curplayer) (cardstr solution))
       (println "Your cards:" (cardstr hand))
@@ -134,10 +138,13 @@
                           reverse flatten rest),
         [responder card :as response]
         (some #(get-response-from % state solution) next-players)]
-    (when response
+    (if response
       (println (c/name-of responder) "showed you:" (c/name-of card))
-      (prompt "Press Enter."))
+      (println "No responses."))
+    (prompt "Press Enter.")
     response))
+
+; public api
 
 (defn-spec get-move ::c/location
   [state ::c/state roll ::c/roll]
@@ -154,12 +161,17 @@
 
 (defn-spec make-suggestion ::c/suggestion
   [state ::c/state]
-  (print-state (state))
+  (print-state state)
   (print "Making a suggestion. ")
-  (let [solution #{(get-choice "person" c/player-chars)
-                   (get-choice "weapon" c/weapons)
-                   (get-choice "room" c/room-chars)}
+  (let [curplayer (c/current-player state)
+        room (->> (get-in state [::c/player-locations curplayer])
+                  (s/assert ::c/room))
+        person (get-choice "person" c/player-chars)
+        weapon (get-choice "weapon" c/weapons)
+        solution #{person weapon room}
         response (get-response state solution)]
-    (cond-> {::c/suggester (c/current-player state)
-             ::c/solution solution}
-      response (assoc ::c/response response))))
+    (u/dissoc-by
+      {::c/suggester curplayer
+       ::c/solution solution
+       ::c/response response}
+      nil?)))

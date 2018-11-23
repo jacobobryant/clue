@@ -5,7 +5,7 @@
   (into {} (for [x xs] [x (f x)])))
 
 (defn dissoc-by [m f]
-  (into {} (remove f m)))
+  (into {} (remove (comp f second) m)))
 
 (defn map-inverse [m]
   (reduce

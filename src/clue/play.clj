@@ -9,11 +9,15 @@
   [state ::c/state]
   (let [player (c/current-player state)
         roll (c/roll-dice)
-        destination (hu/get-move state roll)]
-    (as-> state x
-      (assoc-in x [::c/player-locations player] destination)
-      (update x ::c/suggestions conj (hu/make-suggestion x))
-      (update x ::c/turn inc))))
+        destination (hu/get-move state roll)
+        make-suggestion
+        (if (c/room-chars destination)
+          #(update % ::c/suggestions conj (hu/make-suggestion %))
+          identity)]
+    (-> state
+        (assoc-in [::c/player-locations player] destination)
+        make-suggestion
+        (update ::c/turn inc))))
 
 (defn -main
   [& args]

@@ -1,5 +1,5 @@
 (ns clue.core
-  "Core game logic common to all clients"
+  "Game logic utilities common to all clients"
   (:gen-class)
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
@@ -75,7 +75,7 @@
             (let [board-map (into {} (for [i (range (count board))
                                            j (range 0 raw-board-width 2)]
                                        [[i (quot j 2)] (lookup i j)]))]
-              (u/dissoc-by board-map #(contains? #{\space nil} (second %))))))
+              (u/dissoc-by board-map #(contains? #{\space nil} %)))))
 
 (def board-inverse (dissoc (u/map-inverse starting-board) \-))
 
