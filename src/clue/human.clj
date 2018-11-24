@@ -1,12 +1,14 @@
 (ns clue.human
   "CLI client for human players"
-  (:require [clojure.java.shell :refer [sh]]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [clojure.spec.alpha :as s]
             [clojure.set :refer [intersection]]
             [orchestra.core :refer [defn-spec]]
             [clue.core :as c]
             [clue.util :as u]))
+
+(s/def ::player-coordinates (s/map-of ::c/player ::c/coordinate))
+(s/def ::player-locations (s/map-of ::c/player ::c/location))
 
 (def room-idx-coordinate
   (->>
@@ -17,13 +19,13 @@
       [[room i] (nth coordinates i)])
     (into {})))
 
-(defn-spec player-coordinates-for ::c/player-coordinates
+(defn-spec player-coordinates-for ::player-coordinates
   [[room players] (s/tuple ::c/room ::c/players)]
   (into {} (map-indexed (fn [i p] [p (room-idx-coordinate [room i])])
                         players)))
 
 (defn-spec current-board ::c/board
-  [player-locations ::c/player-locations]
+  [player-locations ::player-locations]
   (let [[player-coordinate player-room]
         (u/split-by #(s/valid? ::c/coordinate (second %)) player-locations)
         player-coordinate
@@ -71,12 +73,10 @@
   [cards ::c/cards]
   (str/join ", " (map c/name-of cards)))
 
-(defn print-cards [state]
-  (->> [::c/hands (c/current-player state)]
-       (get-in state)
-       cardstr
-       (println "Your cards:"))
-  (when-let [face-up-cards (get state ::c/face-up-cards)]
+(defn-spec print-cards any?
+  [state ::c/state]
+  (-> state c/current-player-data ::c/cards cardstr println)
+  (when-let [face-up-cards (::c/face-up-cards state)]
     (println "Face-up cards:" (cardstr face-up-cards))))
 
 (defn print-rooms []
@@ -93,13 +93,17 @@
 (defn clear []
   (doall (repeatedly 50 println)))
 
-(defn print-state [state]
+(defn-spec print-state any?
+  [state ::c/state]
   (clear)
   (print-rooms)
   (print-cards state)
   (println)
-  (print-game-board
-    (current-board (::c/player-locations state)))
+  (->> state
+       c/get-players
+       (u/map-from #(c/location-of % state))
+       current-board
+       print-game-board)
   (println))
 
 (defn-spec get-choice any?
@@ -128,7 +132,7 @@
 
 (defn-spec get-response-from (s/nilable ::c/response)
   [player ::c/player state ::c/state solution ::c/solution]
-  (let [hand (get-in state [::c/hands player])
+  (let [hand (get-in state [::c/player-data-map player ::c/cards])
         choices (intersection solution hand)
         curplayer (c/current-player state)]
     (when (not-empty choices)
@@ -156,10 +160,11 @@
 
 (defn-spec make-move ::c/state
   [state ::c/state]
-  (prompt-player (c/current-player state))
-  (print-state state)
   ; TODO ask about secret tunnels before rolling
-  (let [roll (c/roll-dice)]
+  (let [player (c/current-player state)
+        _ (prompt-player player)
+        _ (print-state state)
+        roll (c/roll-dice)]
     (println "You rolled:" roll)
     (->>
       (loop []
@@ -169,27 +174,24 @@
             (do
               (println "Invalid move")
               (recur)))))
-      (assoc-in state [::c/player-locations (c/current-player state)]))))
+      (assoc-in state [::c/player-data-map player ::c/location]))))
 
 (defn-spec make-suggestion ::c/state
   [state ::c/state]
   (print "Making a suggestion. ")
-  (let [curplayer (c/current-player state)
-        room (->> (get-in state [::c/player-locations curplayer])
-                  (s/assert ::c/room))
+  (let [room (s/assert ::c/room (c/current-location state))
         person (get-choice "person" c/player-chars)
         weapon (get-choice "weapon" c/weapons)
         solution #{person weapon room}
         response (get-response state solution)
-        suggestion (u/dissoc-by
-                     {::c/suggester curplayer
-                      ::c/solution solution
-                      ::c/response response}
-                     nil?)]
+        suggestion (cond->
+                     {::c/suggester (c/current-player state)
+                      ::c/solution solution}
+                     response (assoc ::c/response response))]
     (cond-> state
       true (update ::c/suggestions conj suggestion),
       (some #{person} (c/get-players state))
-      (assoc-in [::c/player-locations person] room))))
+      (assoc-in [::c/player-data-map person ::c/location] room))))
 
 (defn-spec accuse? boolean?
   []
@@ -203,7 +205,7 @@
                    (get-choice "weapon" c/weapons)
                    (get-choice "room" c/room-chars)}
         real-solution (::c/solution state)
-        state (assoc-in state [::c/accusations (c/current-player state)]
+        state (assoc-in state [::c/player-data-map player ::c/accusation]
                         solution)]
     (if (= solution real-solution)
       (println "Correct! You win.")

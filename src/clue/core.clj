@@ -38,8 +38,6 @@
 (s/def ::player player-chars)
 (s/def ::location (s/or :coordinate ::coordinate
                         :room ::room))
-(s/def ::player-coordinates (s/map-of ::player ::coordinate))
-(s/def ::player-locations (s/map-of ::player ::location))
 (s/def ::value (s/or :player ::player
                      :room ::room
                      :room-print room-print-chars
@@ -59,11 +57,12 @@
 (s/def ::suggestion (s/keys :req [::suggester ::solution]
                             :opt [::response]))
 (s/def ::suggestions (s/coll-of ::suggestion))
-(s/def ::hands (s/map-of ::player ::cards))
 (s/def ::face-up-cards ::cards)
-(s/def ::accusations (s/map-of ::player ::solution))
-(s/def ::state (s/keys :req [::player-locations ::hands ::suggestions
-                             ::solution ::accusations]
+(s/def ::accusation ::solution)
+(s/def ::player-data (s/keys :req [::location ::cards]
+                             :opt [::accusation]))
+(s/def ::player-data-map (s/map-of ::player ::player-data))
+(s/def ::state (s/keys :req [::player-data-map ::suggestions ::solution]
                        :opt [::face-up-cards ::turn]))
 (s/def ::roll (s/and number? #(<= 2 % 12)))
 
@@ -101,13 +100,9 @@
 ; Like in Nacho Libre
 (def secret-tunnels {\0 \4, \4 \0, \2 \6, \6 \2})
 
-(defn-spec starting-locations ::player-locations
-  [players ::players]
-  (u/map-from #(first (board-inverse %)) players))
-
 (defn-spec get-players (s/coll-of ::player)
   [state ::state]
-  (sort (keys (::player-locations state))))
+  (sort (keys (::player-data-map state))))
 
 (defn-spec nth-player ::player
   [state ::state n int?]
@@ -115,12 +110,17 @@
     (nth players (mod n (count players)))))
 
 (defn-spec current-player ::player
+  {:fn #(contains? (-> % :args :state ::player-data-map) (:ret %))}
   [state ::state]
   (nth-player state (::turn state)))
 
+(defn-spec location-of ::location
+  [player ::player state ::state]
+  (get-in state [::player-data-map player ::location]))
+
 (defn-spec current-location ::location
   [state ::state]
-  (get-in state [::player-locations (current-player state)]))
+  (location-of (current-player state) state))
 
 (defn-spec adjacent-locations (s/coll-of ::location)
   [source ::coordinate]
@@ -163,11 +163,11 @@
 (defn-spec valid-move? boolean?
   [state ::state destination ::location roll ::roll]
   (let [available (available-locations (current-location state) roll)
-        other-player-coordinates (as-> (::player-locations state) x
-                                   (dissoc x (current-player state))
-                                   (filter #(s/valid? ::coordinate %) x)
-                                   (vals x)
-                                   (set x))]
+        other-player-coordinates (->> (get-players state)
+                                      (remove #{(current-player state)})
+                                      (map #(location-of % state))
+                                      (filter #(s/valid? ::coordinate %))
+                                      set)]
     (and (contains? available destination)
          (not (other-player-coordinates destination)))))
 
@@ -179,17 +179,17 @@
         n-cards-per-player (quot (count deck) (count players))
         hands (->> deck
                    (partition n-cards-per-player)
-                   (map set)
-                   (map vector players)
-                   (into {}))
+                   (map set))
         face-up-cards (set (drop (* n-cards-per-player (count players))
-                                 deck))]
-    (cond-> {::player-locations (starting-locations players)
+                                 deck))
+        player-data-map
+        (into {} (map #(vector %1 {::location (first (board-inverse %1))
+                                   ::cards %2})
+                      players hands))]
+    (cond-> {::player-data-map player-data-map
              ::turn 0
-             ::hands hands
              ::solution solution
-             ::suggestions []
-             ::accusations {}}
+             ::suggestions []}
       (seq face-up-cards) (assoc ::face-up-cards face-up-cards))))
 
 (defn-spec name-of string?
@@ -198,16 +198,32 @@
     (s/valid? ::room x) room-names
     (s/valid? ::player x) player-names))
 
+(defn-spec current-player-data ::player-data
+  [state ::state]
+  (get-in state [::player-data-map (current-player state)]))
+
 (defn-spec current-player-out? boolean?
   [state ::state]
-  (contains? (::accusations state) (current-player state)))
+  (contains? (current-player-data state) ::accusation))
 
 (defn-spec current-player-in-room? any?
   [state ::state]
-  (room-chars (get-in state [::player-locations (current-player state)])))
+  (-> (current-player-data state) ::location room-chars))
+
+(defn-spec accusations (s/coll-of ::accusation)
+  [state ::state]
+  (->> (get-players state)
+       (map #(get-in state [::player-data-map % ::accusation]))
+       (remove nil?)))
+
+(defn-spec locations (s/coll-of ::location)
+  [state ::state]
+  (->> (get-players state)
+       (map #(get-in state [::player-data-map % ::location]))
+       set))
 
 (defn-spec game-over? any?
   [state ::state]
-  (or ((-> state ::accusations vals set) (::solution state))
-      (= (count (::accusations state))
-         (dec (count (get-players state))))))
+  (let [accs (accusations state)]
+    (or (some #{(::solution state)} accs)
+        (= (count accs) (dec (count (get-players state)))))))
