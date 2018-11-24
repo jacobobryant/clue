@@ -202,7 +202,11 @@
   [state ::state]
   (contains? (::accusations state) (current-player state)))
 
-(defn-spec game-over? boolean?
+(defn-spec current-player-in-room? any?
+  [state ::state]
+  (room-chars (get-in state [::player-locations (current-player state)])))
+
+(defn-spec game-over? any?
   [state ::state]
   (or ((-> state ::accusations vals set) (::solution state))
       (= (count (::accusations state))

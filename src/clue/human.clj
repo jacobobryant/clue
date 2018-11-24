@@ -154,20 +154,24 @@
 
 ; public api
 
-(defn-spec get-move ::c/location
-  [state ::c/state roll ::c/roll]
+(defn-spec make-move ::c/state
+  [state ::c/state]
   (prompt-player (c/current-player state))
   (print-state state)
-  (println "You rolled:" roll)
-  (loop []
-    (let [destination (read-location)]
-      (if (c/valid-move? state destination roll)
-        destination
-        (do
-          (println "Invalid move")
-          (recur))))))
+  ; TODO ask about secret tunnels before rolling
+  (let [roll (c/roll-dice)]
+    (println "You rolled:" roll)
+    (->>
+      (loop []
+        (let [destination (read-location)]
+          (if (c/valid-move? state destination roll)
+            destination
+            (do
+              (println "Invalid move")
+              (recur)))))
+      (assoc-in state [::c/player-locations (c/current-player state)]))))
 
-(defn-spec make-suggestion ::c/suggestion
+(defn-spec make-suggestion ::c/state
   [state ::c/state]
   (print "Making a suggestion. ")
   (let [curplayer (c/current-player state)
@@ -176,21 +180,26 @@
         person (get-choice "person" c/player-chars)
         weapon (get-choice "weapon" c/weapons)
         solution #{person weapon room}
-        response (get-response state solution)]
-    (u/dissoc-by
-      {::c/suggester curplayer
-       ::c/solution solution
-       ::c/response response}
-      nil?)))
+        response (get-response state solution)
+        suggestion (u/dissoc-by
+                     {::c/suggester curplayer
+                      ::c/solution solution
+                      ::c/response response}
+                     nil?)]
+    (cond-> state
+      true (update ::c/suggestions conj suggestion),
+      (some #{person} (c/get-players state))
+      (assoc-in [::c/player-locations person] room))))
 
 (defn-spec accuse? boolean?
   []
   (let [choices ["End turn" "Make an accusation"]]
     (= (second choices) (get-choice "option" choices))))
 
-(defn-spec make-accusation ::c/solution
+(defn-spec make-accusation ::c/state
   [state ::c/state]
-  (let [solution #{(get-choice "person" c/player-chars)
+  (let [player (c/current-player state)
+        solution #{(get-choice "person" c/player-chars)
                    (get-choice "weapon" c/weapons)
                    (get-choice "room" c/room-chars)}
         real-solution (::c/solution state)
@@ -198,7 +207,7 @@
                         solution)]
     (if (= solution real-solution)
       (println "Correct! You win.")
-      (println "Wrong. The correct answer was" (cardstr real-solution)))
+      (printf "Wrong. The correct answer was %s.\n" (cardstr real-solution)))
     (when-not (c/game-over? state)
       (prompt "Press Enter."))
-    solution))
+    (if (c/game-over? state) (dissoc state ::c/turn) state)))
