@@ -2,30 +2,39 @@
   (:gen-class)
   (:require [orchestra.spec.test :as st]
             [orchestra.core :refer [defn-spec]]
+            [clojure.spec.alpha :as s]
             [clue.core :as c]
             [clue.util :as u]
-            [clue.human :as hu]))
+            [clue.human :as hu]
+            [clue.ai :as ai]))
 
-(defn-spec next-turn ::c/state
-  [state ::c/state]
-  (if (not (c/game-over? state))
-    (update state ::c/turn inc)
-    state))
+(def config
+  {:human
+   #:clue.core{:make-move ::hu/human
+               :make-suggestion ::hu/human
+               :get-response-from ::hu/human
+               :accuse? ::hu/human
+               :make-accusation ::hu/human}
+   :ai
+   #:clue.core{:init-player-data ::ai/ai
+               :make-move ::ai/ai
+               :make-suggestion ::hu/human
+               :get-response-from ::hu/human
+               :accuse? ::hu/human
+               :make-accusation ::hu/human}})
 
-(defn-spec take-turn ::c/state
-  [state ::c/state]
-  (next-turn
-    (if (c/current-player-out? state)
-      state
-      (u/condas-> state x
-        true (hu/make-move x)
-        (c/current-player-in-room? x) (hu/make-suggestion x)
-        (hu/accuse?) (hu/make-accusation x)))))
+(defn-spec parse-arg-pair (s/tuple ::c/player ::c/config)
+  [[player client] (s/cat :p string? :c string?)]
+  [(first player) (config (keyword client))])
 
 (defn -main
   [& args]
-  (assert (>= (count args) 2))
   (st/instrument)
-  (loop [state (c/initial-state (map first args))]
+  (assert (and (>= (count args) 4)
+               (even? (count args))))
+  (loop [state (->> (partition 2 args)
+                    (map parse-arg-pair)
+                    u/zip
+                    (apply c/initial-state))]
     (when (some? (::c/turn state))
-      (recur (take-turn state)))))
+      (recur (c/take-turn state)))))

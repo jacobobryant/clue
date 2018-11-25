@@ -5,19 +5,17 @@
             [clue.play :as p]
             [clojure.java.io :as io]))
 
+(def og-initial-state c/initial-state)
 (defn mock-roll-dice [] 12)
-(defn mock-initial-state [players]
-  #:clue.core{:player-data-map
-              {\r #:clue.core{:location [0 16],
-                              :cards #{"Rope" \0 \r \6 \y "Wrench"}}
-               \g #:clue.core{:location [24 9],
-                              :cards #{\g "Lead pipe" "Knife" \3 \7 \8}}
-               \y #:clue.core{:location [7 23],
-                              :cards #{"Revolver" \p \1 \2 \4 \w}}}
-              :turn 0,
-              :solution #{\b \5 "Candlestick"},
-              :suggestions []})
 (defn mock-clear [] nil)
+(defn set-cards [state player cards]
+  (assoc-in state [::c/player-data-map player ::c/cards] cards))
+(defn mock-initial-state [players configs]
+  (-> (og-initial-state players configs)
+      (set-cards \y #{"Rope" \0 \r \6 \y "Wrench"})
+      (set-cards \g #{\g "Lead pipe" "Knife" \3 \7 \8})
+      (set-cards \r #{"Revolver" \p \1 \2 \4 \w})
+      (assoc ::c/solution #{\b \5 "Candlestick"})))
 
 ; To generate a test run, comment out `*in* r` below and then run
 ; `tee testrun.txt | lein test`.
@@ -33,4 +31,4 @@
                       c/roll-dice mock-roll-dice
                       c/initial-state mock-initial-state
                       hu/clear mock-clear]
-          (p/-main "red" "green" "yellow"))))))
+          (p/-main "red" "human" "green" "human" "yellow" "human"))))))

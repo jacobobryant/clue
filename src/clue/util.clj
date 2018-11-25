@@ -48,3 +48,11 @@
   `(as-> ~expr ~name
      ~@(map (fn [[test step]] `(if ~test ~step ~name))
             (partition 2 clauses))))
+
+(defn zip [xs]
+  (apply map vector xs))
+
+(defn manhattand [a b]
+  (->> (map - a b)
+       (map #(Math/abs %))
+       (apply +)))

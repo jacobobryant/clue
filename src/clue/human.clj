@@ -130,8 +130,8 @@
   (clear)
   (prompt "%s, press Enter." (c/name-of player)))
 
-(defn-spec get-response-from (s/nilable ::c/response)
-  [player ::c/player state ::c/state solution ::c/solution]
+(defmethod c/get-response-from ::human
+  [state player solution]
   (let [hand (get-in state [::c/player-data-map player ::c/cards])
         choices (intersection solution hand)
         curplayer (c/current-player state)]
@@ -150,16 +150,14 @@
                           (split-with #(not= player %))
                           reverse flatten rest),
         [responder card :as response]
-        (some #(get-response-from % state solution) next-players)]
+        (some #(c/get-response-from state % solution) next-players)]
     (if response
       (println (c/name-of responder) "showed you:" (c/name-of card))
       (println "No responses."))
     response))
 
-; public api
-
-(defn-spec make-move ::c/state
-  [state ::c/state]
+(defmethod c/make-move ::human
+  [state]
   ; TODO ask about secret tunnels before rolling
   (let [player (c/current-player state)
         _ (prompt-player player)
@@ -176,8 +174,8 @@
               (recur)))))
       (assoc-in state [::c/player-data-map player ::c/location]))))
 
-(defn-spec make-suggestion ::c/state
-  [state ::c/state]
+(defmethod c/make-suggestion ::human
+  [state]
   (print "Making a suggestion. ")
   (let [room (s/assert ::c/room (c/current-location state))
         person (get-choice "person" c/player-chars)
@@ -193,13 +191,13 @@
       (some #{person} (c/get-players state))
       (assoc-in [::c/player-data-map person ::c/location] room))))
 
-(defn-spec accuse? boolean?
-  []
+(defmethod c/accuse? ::human
+  [_]
   (let [choices ["End turn" "Make an accusation"]]
     (= (second choices) (get-choice "option" choices))))
 
-(defn-spec make-accusation ::c/state
-  [state ::c/state]
+(defmethod c/make-accusation ::human
+  [state]
   (let [player (c/current-player state)
         solution #{(get-choice "person" c/player-chars)
                    (get-choice "weapon" c/weapons)

@@ -8,6 +8,8 @@
             [orchestra.core :refer [defn-spec]]
             [clue.util :as u]))
 
+; TODO consider reorganizing this file
+
 (def board (-> (slurp (io/resource "board.txt"))
                (str/split #"\n")
                (->> (remove #(empty? (str/trim %))))))
@@ -59,12 +61,54 @@
 (s/def ::suggestions (s/coll-of ::suggestion))
 (s/def ::face-up-cards ::cards)
 (s/def ::accusation ::solution)
-(s/def ::player-data (s/keys :req [::location ::cards]
+
+(s/def ::init-player-data keyword?)
+(s/def ::make-move keyword?)
+(s/def ::make-suggestion keyword?)
+(s/def ::get-response-from keyword?)
+(s/def ::accuse? keyword?)
+(s/def ::make-accusation keyword?)
+(def config-keys #{::init-player-data ::make-move ::make-suggestion
+                   ::get-response-from ::accuse? ::make-accusation})
+(s/def ::config-key config-keys)
+(s/def ::config
+  (s/keys :req [::make-move ::make-suggestion ::get-response-from
+                ::accuse? ::make-accusation]
+          :opt [::init-player-data]))
+
+(s/def ::player-data (s/keys :req [::location ::cards ::config]
                              :opt [::accusation]))
 (s/def ::player-data-map (s/map-of ::player ::player-data))
 (s/def ::state (s/keys :req [::player-data-map ::suggestions ::solution]
                        :opt [::face-up-cards ::turn]))
 (s/def ::roll (s/and number? #(<= 2 % 12)))
+
+(defn-spec get-players (s/coll-of ::player)
+  [state ::state]
+  (sort (keys (::player-data-map state))))
+
+(defn-spec current-player ::player
+  {:fn #(contains? (-> % :args :state ::player-data-map) (:ret %))}
+  [state ::state]
+  (let [players (get-players state)]
+    (nth players (mod (::turn state) (count players)))))
+
+(defn-spec config-lookup keyword?
+  ([config-key ::config-key state ::state player ::player & _ (s/* any?)]
+   (get-in state [::player-data-map player
+                  ::config config-key] :default))
+  ([config-key ::config-key state ::state]
+   (config-lookup config-key state (current-player state))))
+
+(defmulti init-player-data (fn [player-data]
+                             (-> player-data ::config ::init-player-data)))
+(defmulti make-move (partial config-lookup ::make-move))
+(defmulti make-suggestion (partial config-lookup ::make-suggestion))
+(defmulti get-response-from (partial config-lookup ::get-response-from))
+(defmulti accuse? (partial config-lookup ::accuse?))
+(defmulti make-accusation (partial config-lookup ::make-accusation))
+
+(defmethod init-player-data :default [player-data] player-data)
 
 (defn-spec lookup (s/or :some ::value :none (s/nilable #{\space}))
   [i int? j int?]
@@ -99,20 +143,6 @@
 
 ; Like in Nacho Libre
 (def secret-tunnels {\0 \4, \4 \0, \2 \6, \6 \2})
-
-(defn-spec get-players (s/coll-of ::player)
-  [state ::state]
-  (sort (keys (::player-data-map state))))
-
-(defn-spec nth-player ::player
-  [state ::state n int?]
-  (let [players (get-players state)]
-    (nth players (mod n (count players)))))
-
-(defn-spec current-player ::player
-  {:fn #(contains? (-> % :args :state ::player-data-map) (:ret %))}
-  [state ::state]
-  (nth-player state (::turn state)))
 
 (defn-spec location-of ::location
   [player ::player state ::state]
@@ -172,7 +202,7 @@
          (not (other-player-coordinates destination)))))
 
 (defn-spec initial-state ::state
-  [players ::players]
+  [players ::players configs (s/coll-of ::config)]
   (let [decks (map shuffle [player-chars weapons room-chars])
         solution (set (map first decks))
         deck (shuffle (mapcat rest decks))
@@ -183,20 +213,27 @@
         face-up-cards (set (drop (* n-cards-per-player (count players))
                                  deck))
         player-data-map
-        (into {} (map #(vector %1 {::location (first (board-inverse %1))
-                                   ::cards %2})
-                      players hands))]
+        (into {} (map #(vector %1 (init-player-data
+                                    {::location (first (board-inverse %1))
+                                     ::cards %2
+                                     ::config %3}))
+                      players hands configs))]
     (cond-> {::player-data-map player-data-map
              ::turn 0
              ::solution solution
              ::suggestions []}
       (seq face-up-cards) (assoc ::face-up-cards face-up-cards))))
 
-(defn-spec name-of string?
-  [x any?]
+(defn-spec coordinate-name string?
+  [[i j] ::coordinate]
+  (str (u/c+ \a j) (inc i)))
+
+(defn name-of
+  [x]
   (cond-> x
     (s/valid? ::room x) room-names
-    (s/valid? ::player x) player-names))
+    (s/valid? ::player x) player-names
+    (s/valid? ::coordinate x) coordinate-name))
 
 (defn-spec current-player-data ::player-data
   [state ::state]
@@ -227,3 +264,19 @@
   (let [accs (accusations state)]
     (or (some #{(::solution state)} accs)
         (= (count accs) (dec (count (get-players state)))))))
+
+(defn-spec next-turn ::state
+  [state ::state]
+  (if (not (game-over? state))
+    (update state ::turn inc)
+    state))
+
+(defn-spec take-turn ::state
+  [state ::state]
+  (next-turn
+    (if (current-player-out? state)
+      state
+      (u/condas-> state x
+        true (make-move x)
+        (current-player-in-room? x) (make-suggestion x)
+        (accuse? x) (make-accusation x)))))
