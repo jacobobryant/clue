@@ -18,9 +18,9 @@
    :ai
    #:clue.core{:init-player-data ::ai/ai
                :make-move ::ai/ai
-               :make-suggestion ::hu/human
-               :get-response-from ::hu/human
-               :accuse? ::hu/human
+               :make-suggestion ::ai/ai
+               :get-response-from ::ai/ai
+               :accuse? ::ai/ai
                :make-accusation ::hu/human}})
 
 (defn-spec parse-arg-pair (s/tuple ::c/player ::c/config)

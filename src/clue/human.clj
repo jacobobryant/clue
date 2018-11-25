@@ -75,7 +75,8 @@
 
 (defn-spec print-cards any?
   [state ::c/state]
-  (-> state c/current-player-data ::c/cards cardstr println)
+  (->> state c/current-player-data ::c/cards cardstr
+       (println "Your cards:"))
   (when-let [face-up-cards (::c/face-up-cards state)]
     (println "Face-up cards:" (cardstr face-up-cards))))
 
@@ -132,29 +133,16 @@
 
 (defmethod c/get-response-from ::human
   [state player solution]
-  (let [hand (get-in state [::c/player-data-map player ::c/cards])
-        choices (intersection solution hand)
+  (let [choices (c/response-choices state player solution)
+        hand (get-in state [::c/player-data-map player ::c/cards])
         curplayer (c/current-player state)]
     (when (not-empty choices)
       (prompt-player player)
       (printf "%s suggested %s.\n" (c/name-of curplayer) (cardstr solution))
       (println "Your cards:" (cardstr hand))
       (let [response [player (get-choice "card" choices)]]
-        (prompt-player curplayer)
+        (clear)
         response))))
-
-(defn-spec get-response (s/nilable ::c/response)
-  [state ::c/state solution ::c/solution]
-  (let [player (c/current-player state),
-        next-players (->> (c/get-players state)
-                          (split-with #(not= player %))
-                          reverse flatten rest),
-        [responder card :as response]
-        (some #(c/get-response-from state % solution) next-players)]
-    (if response
-      (println (c/name-of responder) "showed you:" (c/name-of card))
-      (println "No responses."))
-    response))
 
 (defmethod c/make-move ::human
   [state]
@@ -177,19 +165,14 @@
 (defmethod c/make-suggestion ::human
   [state]
   (print "Making a suggestion. ")
-  (let [room (s/assert ::c/room (c/current-location state))
-        person (get-choice "person" c/player-chars)
-        weapon (get-choice "weapon" c/weapons)
-        solution #{person weapon room}
-        response (get-response state solution)
-        suggestion (cond->
-                     {::c/suggester (c/current-player state)
-                      ::c/solution solution}
-                     response (assoc ::c/response response))]
-    (cond-> state
-      true (update ::c/suggestions conj suggestion),
-      (some #{person} (c/get-players state))
-      (assoc-in [::c/player-data-map person ::c/location] room))))
+  (let [person (get-choice "person" c/player-chars),
+        weapon (get-choice "weapon" c/weapons),
+        [state [responder card :as response]]
+        (c/get-response state person weapon)]
+    (if response
+      (println (c/name-of responder) "showed you:" (c/name-of card))
+      (println "No responses."))
+    state))
 
 (defmethod c/accuse? ::human
   [_]

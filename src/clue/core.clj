@@ -271,6 +271,25 @@
     (update state ::turn inc)
     state))
 
+(defn-spec get-response (s/tuple ::state (s/nilable ::response))
+  [state ::state person ::player weapon ::weapon]
+  (let [room (s/assert ::room (current-location state))
+        solution #{person weapon room}
+        curplayer (current-player state)
+        next-players (->> (get-players state)
+                          (split-with #(not= curplayer %))
+                          reverse flatten rest)
+        response (some #(get-response-from state % solution) next-players)
+        suggestion (cond->
+                     {::suggester (current-player state)
+                      ::solution solution}
+                     response (assoc ::response response))
+        state (cond-> state
+                true (update ::suggestions conj suggestion),
+                (some #{person} (get-players state))
+                (assoc-in [::player-data-map person ::location] room))]
+    [state response]))
+
 (defn-spec take-turn ::state
   [state ::state]
   (next-turn
@@ -280,3 +299,8 @@
         true (make-move x)
         (current-player-in-room? x) (make-suggestion x)
         (accuse? x) (make-accusation x)))))
+
+(defn-spec response-choices (s/coll-of ::card)
+  [state ::state player ::player solution ::solution]
+  (let [hand (get-in state [::player-data-map player ::cards])]
+    (intersection solution hand)))
