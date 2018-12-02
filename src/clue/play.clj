@@ -20,8 +20,9 @@
                :make-move ::ai/ai
                :make-suggestion ::ai/ai
                :get-response-from ::ai/ai
+               :think ::ai/ai
                :accuse? ::ai/ai
-               :make-accusation ::hu/human}})
+               :make-accusation ::ai/ai}})
 
 (defn-spec parse-arg-pair (s/tuple ::c/player ::c/config)
   [[player client] (s/cat :p string? :c string?)]

@@ -51,7 +51,7 @@
 (s/def ::card (s/or :person ::player
                     :weapon ::weapon
                     :room ::room))
-(s/def ::cards (s/coll-of ::card))
+(s/def ::cards (s/and (s/coll-of ::card) set?))
 (s/def ::solution ::cards)
 (s/def ::person ::player)
 (s/def ::suggester ::player)
@@ -68,7 +68,7 @@
 (s/def ::get-response-from keyword?)
 (s/def ::accuse? keyword?)
 (s/def ::make-accusation keyword?)
-(def config-keys #{::init-player-data ::make-move ::make-suggestion
+(def config-keys #{::init-player-data ::make-move ::make-suggestion ::think
                    ::get-response-from ::accuse? ::make-accusation})
 (s/def ::config-key config-keys)
 (s/def ::config
@@ -100,15 +100,20 @@
   ([config-key ::config-key state ::state]
    (config-lookup config-key state (current-player state))))
 
-(defmulti init-player-data (fn [player-data]
+(defmulti init-player-data (fn [player-data players cur-player]
                              (-> player-data ::config ::init-player-data)))
 (defmulti make-move (partial config-lookup ::make-move))
 (defmulti make-suggestion (partial config-lookup ::make-suggestion))
 (defmulti get-response-from (partial config-lookup ::get-response-from))
+(defmulti think (partial config-lookup ::think))
 (defmulti accuse? (partial config-lookup ::accuse?))
 (defmulti make-accusation (partial config-lookup ::make-accusation))
 
-(defmethod init-player-data :default [player-data] player-data)
+(defmethod init-player-data
+  :default [player-data players cur-player]
+  player-data)
+
+(defmethod think :default [state] state)
 
 (defn-spec lookup (s/or :some ::value :none (s/nilable #{\space}))
   [i int? j int?]
@@ -206,17 +211,19 @@
   (let [decks (map shuffle [player-chars weapons room-chars])
         solution (set (map first decks))
         deck (shuffle (mapcat rest decks))
-        n-cards-per-player (quot (count deck) (count players))
+        hand-size (quot (count deck) (count players))
         hands (->> deck
-                   (partition n-cards-per-player)
+                   (partition hand-size)
                    (map set))
-        face-up-cards (set (drop (* n-cards-per-player (count players))
+        face-up-cards (set (drop (* hand-size (count players))
                                  deck))
         player-data-map
         (into {} (map #(vector %1 (init-player-data
                                     {::location (first (board-inverse %1))
                                      ::cards %2
-                                     ::config %3}))
+                                     ::config %3}
+                                    players
+                                    %1))
                       players hands configs))]
     (cond-> {::player-data-map player-data-map
              ::turn 0
@@ -271,14 +278,19 @@
     (update state ::turn inc)
     state))
 
+(defn-spec get-next-players ::players
+  ([state ::state player ::player]
+   (->> (get-players state)
+        (split-with #(not= player %))
+        reverse flatten rest))
+  ([state ::state]
+   (get-next-players state (current-player state))))
+
 (defn-spec get-response (s/tuple ::state (s/nilable ::response))
   [state ::state person ::player weapon ::weapon]
   (let [room (s/assert ::room (current-location state))
         solution #{person weapon room}
-        curplayer (current-player state)
-        next-players (->> (get-players state)
-                          (split-with #(not= curplayer %))
-                          reverse flatten rest)
+        next-players (get-next-players state)
         response (some #(get-response-from state % solution) next-players)
         suggestion (cond->
                      {::suggester (current-player state)
@@ -298,9 +310,14 @@
       (u/condas-> state x
         true (make-move x)
         (current-player-in-room? x) (make-suggestion x)
+        true (think x)
         (accuse? x) (make-accusation x)))))
 
 (defn-spec response-choices (s/coll-of ::card)
   [state ::state player ::player solution ::solution]
   (let [hand (get-in state [::player-data-map player ::cards])]
     (intersection solution hand)))
+
+(defn-spec hand-size int?
+  [state ::state]
+  (count (::cards (current-player-data state))))
