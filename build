@@ -1,0 +1,8 @@
+#!/bin/bash
+cmd="$1"
+shift
+case "$cmd" in
+  play)
+    clj -m clue.play "$@"
+    ;;
+esac

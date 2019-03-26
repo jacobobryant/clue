@@ -1,0 +1,6 @@
+{:paths ["resources" "src"]
+ :deps
+ {org.clojure/clojure {:mvn/version "1.10.0"}
+  orchestra {:mvn/version "2019.02.06-1"}
+  org.clojure/tools.namespace {:mvn/version "0.2.11"}
+  org.clojure/core.logic {:mvn/version "0.8.11"}}}
