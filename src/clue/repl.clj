@@ -3,18 +3,46 @@
             [clojure.set :refer [union intersection difference]]
             [orchestra.spec.test :as st]
             [orchestra.core :refer [defn-spec]]
-            [clojure.tools.namespace.repl :refer [refresh]]
+            [clojure.tools.namespace.repl :as tn]
             [clojure.core.logic :as logic]
             [clojure.core.logic.pldb :as pldb]
             [clojure.core.logic.fd :as fd]
-            [clue.util :as u]
+            [jobryant.util :as u]
             [clue.core :as c]
             [clue.human :as h]
             [clue.ai :as ai]
             [clue.play :as p]
-            [clue.core-test :as t]))
+            [clue.core-test :as t]
+            [clue.db]
+            [mount.core :as mount]
+            [nrepl.server :refer [start-server]]))
 
 (st/instrument)
+
+(comment
+  (nrepl.server/start-server :port 7888)
+
+  ; for un-botching the repl
+  (require '[clojure.tools.namespace.repl :as tn])
+  (tn/set-refresh-dirs "src" "test")
+  (tn/refresh)
+
+  (require '[clojure.core.async :refer [<! go-loop]])
+
+)
+
+(tn/set-refresh-dirs "src" "test")
+
+(defn nrepl []
+  (start-server :port 7888))
+
+(defn go []
+  (mount/start)
+  :ready)
+
+(defn reset []
+  (mount/stop)
+  (tn/refresh :after 'clue.repl/go))
 
 (def test-state
   (assoc (t/mock-initial-state [\r \g \y] (repeat 3 (:ai p/config)))

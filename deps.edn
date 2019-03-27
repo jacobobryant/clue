@@ -1,6 +1,11 @@
-{:paths ["resources" "src"]
+{:paths ["resources" "src" "test"]
  :deps
  {org.clojure/clojure {:mvn/version "1.10.0"}
   orchestra {:mvn/version "2019.02.06-1"}
   org.clojure/tools.namespace {:mvn/version "0.2.11"}
-  org.clojure/core.logic {:mvn/version "0.8.11"}}}
+  org.clojure/core.logic {:mvn/version "0.8.11"}
+  com.datomic/datomic-free {:mvn/version "0.9.5697"}
+  mount #:mvn{:version "0.1.15"}
+  org.clojure/core.async {:mvn/version "0.4.490"}
+  nrepl {:mvn/version "0.6.0"}
+  me.raynes/fs {:mvn/version "1.4.6"}}}

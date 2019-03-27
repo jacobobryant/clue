@@ -5,4 +5,7 @@ case "$cmd" in
   play)
     clj -m clue.play "$@"
     ;;
+  repl)
+    clj -e "(do (doto 'clue.repl require in-ns) (nrepl) (go))" -r
+    ;;
 esac

@@ -7,7 +7,7 @@
             [orchestra.core :refer [defn-spec]]
             [clue.core :as c]
             [clue.human :as hu]
-            [clue.util :as u]))
+            [jobryant.util :as u]))
 
 (s/def ::target ::c/room)
 (s/def ::card-position (conj (set c/player-chars) ::solution))

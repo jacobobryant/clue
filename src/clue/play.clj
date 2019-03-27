@@ -4,7 +4,7 @@
             [orchestra.core :refer [defn-spec]]
             [clojure.spec.alpha :as s]
             [clue.core :as c]
-            [clue.util :as u]
+            [jobryant.util :as u]
             [clue.human :as hu]
             [clue.ai :as ai]))
 

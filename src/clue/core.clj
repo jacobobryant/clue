@@ -6,7 +6,7 @@
             [clojure.spec.alpha :as s]
             [clojure.set :refer [intersection union difference]]
             [orchestra.core :refer [defn-spec]]
-            [clue.util :as u]))
+            [jobryant.util :as u]))
 
 ; TODO consider reorganizing this file
 

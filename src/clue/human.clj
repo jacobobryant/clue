@@ -5,7 +5,7 @@
             [clojure.set :refer [intersection]]
             [orchestra.core :refer [defn-spec]]
             [clue.core :as c]
-            [clue.util :as u]))
+            [jobryant.util :as u]))
 
 (s/def ::player-coordinates (s/map-of ::c/player ::c/coordinate))
 (s/def ::player-locations (s/map-of ::c/player ::c/location))

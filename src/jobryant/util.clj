@@ -1,4 +1,7 @@
-(ns clue.util)
+(ns jobryant.util)
+
+(defmacro capture [& xs]
+  `(do ~@(for [x xs] `(def ~x ~x))))
 
 (defn map-from
   [f xs]
@@ -56,3 +59,11 @@
   (->> (map - a b)
        (map #(Math/abs %))
        (apply +)))
+
+(defmacro pullall [ns]
+  `(do ~@(for [[sym var] (ns-publics ns)]
+           `(def ~sym ~var))))
+
+; move instead of copy
+(defn move [src dest]
+  (spit dest (slurp src)))
