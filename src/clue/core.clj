@@ -188,8 +188,7 @@
                  (union visited next-batch)
                  next-batch))))))
 
-(defn-spec roll-dice ::roll
-  []
+(defn-spec roll-dice ::roll []
   (apply + (repeatedly 2 #(inc (rand-int 6)))))
 
 ; This assumes that you can move through a space occupied by an opponent as

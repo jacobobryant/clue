@@ -1,8 +1,5 @@
 (ns jobryant.util)
 
-(defmacro capture [& xs]
-  `(do ~@(for [x xs] `(def ~x ~x))))
-
 (defn map-from
   [f xs]
   (into {} (for [x xs] [x (f x)])))
@@ -40,9 +37,13 @@
 (defn c- [& cs]
   (apply cop - cs))
 
-(defn parse-int [s]
-  (when (re-matches #"\d+" s)
-    (Integer/parseInt s)))
+(defn zip [xs]
+  (apply map vector xs))
+
+#?(:clj (do
+
+(defmacro capture [& xs]
+  `(do ~@(for [x xs] `(def ~x ~x))))
 
 (defmacro condas->
   "Combination of as-> and cond->."
@@ -52,18 +53,28 @@
      ~@(map (fn [[test step]] `(if ~test ~step ~name))
             (partition 2 clauses))))
 
-(defn zip [xs]
-  (apply map vector xs))
+(defmacro pullall [ns]
+  `(do ~@(for [[sym var] (ns-publics ns)]
+           `(def ~sym ~var))))
+
+(defmacro cljs-pullall [ns & syms]
+  `(do ~@(for [s syms]
+           `(def ~s ~(symbol (str ns) (str s))))))
+
+(defmacro foo [ns]
+  (pr-str (ns-publics ns)))
+
+; todo move instead of copy
+(defn move [src dest]
+  (spit dest (slurp src)))
 
 (defn manhattand [a b]
   (->> (map - a b)
        (map #(Math/abs %))
        (apply +)))
 
-(defmacro pullall [ns]
-  `(do ~@(for [[sym var] (ns-publics ns)]
-           `(def ~sym ~var))))
+(defn parse-int [s]
+  (when (re-matches #"\d+" s)
+    (Integer/parseInt s)))
 
-; move instead of copy
-(defn move [src dest]
-  (spit dest (slurp src)))
+))

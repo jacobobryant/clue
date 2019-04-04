@@ -14,6 +14,8 @@
             [clue.play :as p]
             [clue.core-test :as t]
             [clue.db]
+            [clue.backend.ws]
+            [clue.backend.http]
             [mount.core :as mount]
             [nrepl.server :refer [start-server]]))
 

@@ -8,4 +8,7 @@ case "$cmd" in
   repl)
     clj -e "(do (doto 'clue.repl require in-ns) (nrepl) (go))" -r
     ;;
+  fig)
+    clj -m figwheel.main -b dev -r
+    ;;
 esac

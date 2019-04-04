@@ -1,0 +1,3 @@
+{:main clue.client.core
+ :output-to "target/cljs/public/js/main.js"
+ :output-dir "target/cljs/public/js/"}

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset='utf-8'>
+        <title>Play Clue</title>
+
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.5/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/assets/css/material-design-iconic-font.min.css">
+        <link rel="stylesheet" href="/assets/css/re-com.css">
+
+        <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,400italic" rel="stylesheet" type="text/css">
+        <link href='https://fonts.googleapis.com/css?family=Roboto+Condensed:400,300' rel='stylesheet' type='text/css'>
+
+        <script src="/js/main.js" type="text/javascript"></script>
+    </head>
+    <body>
+        <div id="app" style="height: inherit"></div>
+        <script>
+            window.prstr  = function (obj) { return cljs.core.pr_str(obj) };
+            window.onload = function () {
+                clue.client.core._main();
+            }
+        </script>
+    </body>
+</html>
