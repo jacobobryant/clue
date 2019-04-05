@@ -3,10 +3,12 @@
             [clue.client.db :as db :refer [db]]))
 
 (defn new-game! []
-  (swap! db assoc :new-game :pending)
   (send! [:clue/new-game nil]))
 
 (defn leave-game! []
   (let [game-id @db/game-id]
     (swap! db dissoc :game)
     (send! [:clue/leave-game game-id])))
+
+(defn join-game! [game-id]
+  (send! [:clue/join-game game-id]))

@@ -1,8 +1,10 @@
 (ns clue.client.views
   (:require [jobryant.re-com.core :as rc]
+            [jobryant.util :as u]
             [clue.client.color :as color]
             [clue.client.db :as db :refer [db]]
-            [clue.client.event :as event]))
+            [clue.client.event :as event]
+            [clojure.string :refer [join]]))
 
 (defn header-title [label level]
   [rc/title
@@ -26,14 +28,14 @@
     :href "/logout"]])
 
 (defn mapview [m]
-  (into [rc/v-box]
-        (for [[k v] m]
-          [rc/h-box
-           [rc/label
-            :label (str k ":")
-            :style {:font-weight "bold"}
-            :width "100px"]
-           [rc/label :label v]])))
+  [rc/v-box
+   (rc/for [[k v] m]
+     [rc/h-box
+      [rc/label
+       :label (str k ":")
+       :style {:font-weight "bold"}
+       :width "100px"]
+      [rc/label :label v]])])
 
 (defn new-game []
   [rc/v-box
@@ -49,15 +51,34 @@
      :label "Leave game"
      :on-click event/leave-game!]]])
 
+(def cell-style {:style {:padding-right 15}})
+
+(defn table [header-row rows]
+  [:table.table {:style {:width "initial"
+                         :min-width "50%"}}
+   [:thead
+    [:tr (rc/for [th header-row] [:th cell-style th])]]
+   [:tbody
+    (rc/for [r rows]
+      [:tr (rc/for [td r] [:td cell-style td])])]])
+
 (defn lobby []
   [rc/v-box
+   [rc/title
+    :label "Games"
+    :level :level2]
+   [table
+    ["ID" "Players" ""]
+    (for [game @db/new-games]
+      [(:game/id game)
+       (join ", " (:game/players game))
+       [rc/button
+        :label "Join"
+        :on-click #(event/join-game! (:game/id game))]])]
    [rc/h-box
     [rc/button
-     :label "New game"
-     :on-click event/new-game!
-     :disabled? db/new-game-pending?]
-    (when @db/new-game-pending?
-      [rc/throbber :size :small :color color/primary])]])
+     :label "Create game"
+     :on-click event/new-game!]]])
 
 (defn main [nav-state]
   [:div {:style {:height "100%"

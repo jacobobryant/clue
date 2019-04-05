@@ -1,7 +1,8 @@
 (ns jobryant.re-com.core
   (:require [re-com.core :as rc]
             [clojure.pprint :refer [pprint]])
-  (:require-macros [jobryant.util :as u]))
+  (:require-macros [jobryant.util :as u]
+                   [jobryant.re-com.core]))
 
 (u/cljs-pullall re-com.core
                 align-style horizontal-pill-tabs row-button popover-border border

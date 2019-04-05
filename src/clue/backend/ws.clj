@@ -5,12 +5,20 @@
             [clojure.pprint :refer [pprint]]
             [jobryant.util :as u]
             [jobryant.datomic.api :as d]
-            [clue.db :refer [conn]]))
+            [clue.db :as db :refer [conn]]))
+
+(defn username [event]
+  (or (get-in event [:ring-req :session :uid])
+      (get-in event [:session :uid])))
 
 (let [{:keys [ch-recv send-fn connected-uids
               ajax-post-fn ajax-get-or-ws-handshake-fn]}
       (sente/make-channel-socket!
-        (get-sch-adapter) {:user-id-fn :client-id})]
+        (get-sch-adapter) {:user-id-fn :client-id
+                           #_(fn [event]
+                               (u/capture event)
+                               {:client-id (:client-id event)
+                                :username (username event)})})]
 
   (def ring-ajax-post                ajax-post-fn)
   (def ring-ajax-get-or-ws-handshake ajax-get-or-ws-handshake-fn)
@@ -40,20 +48,16 @@
            ch-chsk event-msg-handler)
   :stop (ws-router-stop-fn))
 
-(defn game [username]
-  (-> (d/q '[:find (pull ?e [*]) .
-             :in $ ?username
-             :where [?e :game/players ?username]]
-           (d/db conn) username)
-      (dissoc :db/id)))
-
-(defn username [event]
-  (get-in event [:ring-req :session :uid]))
-
 (defmethod handler :chsk/uidport-open [event]
   (let [_username (username event)]
     (chsk-send! (:uid event) [:db/merge {:username _username
-                                         :game (game _username)}])))
+                                         :new-games (db/new-games)}])))
+
+(defn broadcast-new-games! []
+  ; exclude people in started games
+  (let [games (db/new-games)]
+    (doseq [uid (:any @*connected-uids)]
+      (chsk-send! uid [:db/merge {:new-games games}]))))
 
 (defmethod handler :clue/new-game [event]
   ; Make sure this fails if game id is taken.
@@ -62,10 +66,13 @@
     @(d/transact conn [{:db/id "new-game"
                         :game/id game-id
                         :game/players [_username]}])
-    (chsk-send! (:uid event) [:db/merge {:game (game _username) :new-game nil}])))
+    (broadcast-new-games!)))
 
 (defmethod handler :clue/leave-game [{game-id :?data :as event}]
-  (u/capture game-id event)
   @(d/transact conn [[:clue/leave-game game-id (username event)]])
-  ; send event to other players
-  )
+  (broadcast-new-games!))
+
+(defmethod handler :clue/join-game [{game-id :?data :as event}]
+  @(d/transact conn [{:game/id game-id
+                      :game/players [(username event)]}])
+  (broadcast-new-games!))

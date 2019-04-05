@@ -28,3 +28,10 @@
                          [[:db/retract [:game/id game-id] :game/players username]]))})}])
 
 (defstate conn :start (d/connect db-uri schema data))
+
+(defn new-games []
+  (->> (d/q '[:find [(pull ?e [*]) ...]
+              :where [?e :game/id]]
+            (d/db conn))
+       (map #(dissoc % :db/id))
+       (map #(update % :game/players set))))
