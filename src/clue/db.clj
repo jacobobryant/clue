@@ -9,29 +9,20 @@
 
 (def schema
   {:game/id [:db.type/string :db.unique/identity]
-   :game/players [:db.type/string :db.cardinality/many]})
+   :game/players [:db.type/string :db.cardinality/many]
+   :game/status [:db.type/ref]
+   :game.status/new []
+   :game.status/ongoing []
+   :game.status/done []})
 
-(def data
-  [{:db/ident :clue/leave-game
-    :db/fn (d/function
-             '{:lang "clojure"
-               :params [db game-id username]
-               :requires [[datomic.api :as d]]
-               :code (let [remove-game?
-                           (= 1 (d/q '[:find (count ?player) .
-                                       :in $ ?game ?username
-                                       :where [?game :game/players ?username]
-                                              [?game :game/players ?player]]
-                                     db [:game/id game-id] username))]
-                       (if remove-game?
-                         [[:db.fn/retractEntity [:game/id game-id]]]
-                         [[:db/retract [:game/id game-id] :game/players username]]))})}])
-
-(defstate conn :start (d/connect db-uri schema data))
+(defstate conn :start (d/connect db-uri {:schema schema
+                                         :tx-fn-ns 'clue.backend.tx
+                                         :data []}))
 
 (defn new-games []
-  (->> (d/q '[:find [(pull ?e [*]) ...]
+  (->> (d/q '[:find [(pull ?e [* {:game/status [:db/ident]}]) ...]
               :where [?e :game/id]]
             (d/db conn))
        (map #(dissoc % :db/id))
-       (map #(update % :game/players set))))
+       (map #(update % :game/players set))
+       (map #(update % :game/status :db/ident))))

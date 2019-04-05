@@ -65,14 +65,19 @@
         game-id (u/rand-str 4)]
     @(d/transact conn [{:db/id "new-game"
                         :game/id game-id
-                        :game/players [_username]}])
+                        :game/players [_username]
+                        :game/status :game.status/new}])
     (broadcast-new-games!)))
 
 (defmethod handler :clue/leave-game [{game-id :?data :as event}]
-  @(d/transact conn [[:clue/leave-game game-id (username event)]])
+  @(d/transact conn [[:clue.backend.tx/leave-game game-id (username event)]])
   (broadcast-new-games!))
 
 (defmethod handler :clue/join-game [{game-id :?data :as event}]
   @(d/transact conn [{:game/id game-id
                       :game/players [(username event)]}])
+  (broadcast-new-games!))
+
+(defmethod handler :clue/start-game [event]
+  @(d/transact conn [[:clue.backend.tx/start-game (username event)]])
   (broadcast-new-games!))

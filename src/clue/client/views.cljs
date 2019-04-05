@@ -46,6 +46,7 @@
    [rc/h-box
     [rc/button
      :label "Start game"
+     :on-click event/start-game!
      :disabled? (not @db/can-start-game?)]
     [rc/button
      :label "Leave game"

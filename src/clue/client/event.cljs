@@ -12,3 +12,6 @@
 
 (defn join-game! [game-id]
   (send! [:clue/join-game game-id]))
+
+(defn start-game! []
+  (send! [:clue/start-game nil]))

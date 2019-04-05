@@ -1,7 +1,7 @@
 (ns jobryant.datomic.api
   (:refer-clojure :exclude [sync filter])
   (:require [jobryant.util :as u]
-            [jobryant.datomic.util :refer [ref? expand-schema]]
+            [jobryant.datomic.util :refer [ref? expand-schema expand-tx-fns]]
             [datomic.api :as d]
             [clojure.java.io :refer [reader writer]]
             [me.raynes.fs :as fs]
@@ -54,15 +54,16 @@
       (update :eids merge (:tempids result))
       (assoc :db (:db-after result))))
 
-(defn connect [db-uri schema data]
+(defn connect [db-uri {:keys [schema tx-fn-ns data]}]
   (d/delete-database db-uri)
   (d/create-database db-uri)
   (let [conn (d/connect db-uri)
         tmp-storage (fs/temp-file "jobryant-datomic-api")]
-    (doseq [tx [(expand-schema schema) data]]
-      @(d/transact conn (conj tx
-                              {:db/id "datomic.tx"
-                               :db/txInstant #inst "2000-01-01T00:00:00.000-00:00"})))
+    (doseq [tx [(expand-schema schema)
+                (expand-tx-fns tx-fn-ns)
+                data]]
+      @(d/transact conn (conj tx {:db/id "datomic.tx"
+                                  :db/txInstant #inst "2000-01-01T00:00:00.000-00:00"})))
     (with-open [rdr (reader storage)
                 wrtr (writer tmp-storage)]
       (reduce
