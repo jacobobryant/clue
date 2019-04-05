@@ -68,18 +68,29 @@
    [rc/title
     :label "Games"
     :level :level2]
-   [table
-    ["ID" "Players" ""]
-    (for [game @db/new-games]
-      [(:game/id game)
-       (join ", " (:game/players game))
-       [rc/button
-        :label "Join"
-        :on-click #(event/join-game! (:game/id game))]])]
+   (if @db/have-new-games?
+     [table
+      ["ID" "Players" ""]
+      (for [game @db/new-games]
+        [(:game/id game)
+         (join ", " (:game/players game))
+         [rc/button
+          :label "Join"
+          :on-click #(event/join-game! (:game/id game))]])]
+     [rc/p "No games yet."])
    [rc/h-box
     [rc/button
      :label "Create game"
      :on-click event/new-game!]]])
+
+(defn ongoing-game []
+  [rc/v-box
+   [rc/title
+    :label (str "Game ID: " @db/game-id)
+    :level :level2]
+   [rc/button
+    :label "Quit"
+    :on-click event/quit!]])
 
 (defn main [nav-state]
   [:div {:style {:height "100%"
@@ -93,4 +104,5 @@
                          :size :large
                          :color color/primary]
       @db/in-new-game? [new-game]
+      @db/in-ongoing-game? [ongoing-game]
       :default [lobby])]])

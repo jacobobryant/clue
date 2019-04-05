@@ -5,6 +5,7 @@
             [clojure.pprint :refer [pprint]]
             [jobryant.util :as u]
             [jobryant.datomic.api :as d]
+            [clue.backend.query :as q]
             [clue.db :as db :refer [conn]]))
 
 (defn username [event]
@@ -51,33 +52,24 @@
 (defmethod handler :chsk/uidport-open [event]
   (let [_username (username event)]
     (chsk-send! (:uid event) [:db/merge {:username _username
-                                         :new-games (db/new-games)}])))
+                                         :new-games (q/new-games (d/db conn))}])))
 
 (defn broadcast-new-games! []
   ; exclude people in started games
-  (let [games (db/new-games)]
+  (let [games (q/new-games (d/db conn))]
     (doseq [uid (:any @*connected-uids)]
       (chsk-send! uid [:db/merge {:new-games games}]))))
 
+; move this to tx fn
+; then make it so you can specify if the fn should be atomic or not/what parts of the fn should be atomic
 (defmethod handler :clue/new-game [event]
   ; Make sure this fails if game id is taken.
-  (let [_username (username event)
-        game-id (u/rand-str 4)]
-    @(d/transact conn [{:db/id "new-game"
-                        :game/id game-id
-                        :game/players [_username]
-                        :game/status :game.status/new}])
-    (broadcast-new-games!)))
-
-(defmethod handler :clue/leave-game [{game-id :?data :as event}]
-  @(d/transact conn [[:clue.backend.tx/leave-game game-id (username event)]])
+  @(d/transact conn [{:db/id "new-game"
+                      :game/id (u/rand-str 4)
+                      :game/players [(username event)]
+                      :game/status :game.status/new}])
   (broadcast-new-games!))
 
-(defmethod handler :clue/join-game [{game-id :?data :as event}]
-  @(d/transact conn [{:game/id game-id
-                      :game/players [(username event)]}])
-  (broadcast-new-games!))
-
-(defmethod handler :clue/start-game [event]
-  @(d/transact conn [[:clue.backend.tx/start-game (username event)]])
+(defmethod handler :clue/tx [{[fn-keyword & args] :?data :as event}]
+  @(d/transact conn [(into [fn-keyword (username event)] args)])
   (broadcast-new-games!))

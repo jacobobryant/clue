@@ -7,6 +7,7 @@
 (def username (reaction (:username @db)))
 (def loaded? (reaction (some? @db)))
 (def new-games (reaction (:new-games @db)))
+(def have-new-games? (reaction (not (empty? @new-games))))
 (def game (reaction (first (filter #(contains? (:game/players %) @username) @new-games))))
 (def game-status (reaction (:game/status @game)))
 (def in-new-game? (reaction (= :game.status/new @game-status)))

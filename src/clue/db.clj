@@ -18,11 +18,3 @@
 (defstate conn :start (d/connect db-uri {:schema schema
                                          :tx-fn-ns 'clue.backend.tx
                                          :data []}))
-
-(defn new-games []
-  (->> (d/q '[:find [(pull ?e [* {:game/status [:db/ident]}]) ...]
-              :where [?e :game/id]]
-            (d/db conn))
-       (map #(dissoc % :db/id))
-       (map #(update % :game/players set))
-       (map #(update % :game/status :db/ident))))
