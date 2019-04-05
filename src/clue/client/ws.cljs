@@ -1,12 +1,15 @@
 (ns clue.client.ws
   (:require [taoensso.sente :as sente]
-            [clue.client.db :refer [db]]))
+            [clue.client.db :refer [db]]
+            [jobryant.util :as u]))
 
 (defmulti handler :id)
-(defmethod handler :default [event] (println "unhandled event:" event))
+(defmethod handler :default [event]
+  nil #_(println "unhandled event:" event))
 
 (defmulti recv-handler :id)
-(defmethod recv-handler :default [event] (println "unhandled recv event:" event))
+(defmethod recv-handler :default [event]
+  nil #_(println "unhandled recv event:" event))
 
 (defmethod handler :chsk/recv [event]
   (recv-handler (into {} (map vector [:id :data] (:?data event)))))
@@ -20,7 +23,5 @@
     (def send! send-fn)
     (sente/start-client-chsk-router! ch-chsk handler)))
 
-(defmethod recv-handler :db/assoc-in [{:keys [data]}]
-  (let [value (last data)
-        path (butlast data)]
-    (swap! db assoc-in path value)))
+(defmethod recv-handler :db/merge [{:keys [data]}]
+  (swap! db u/merge-some data))

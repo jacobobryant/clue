@@ -20,8 +20,8 @@
 (defn hv-box [box props & children]
   (if (map? props)
     (into [box :children children]
-          (apply concat props))
-    [box :children (into [props] children)]))
+          (apply concat (merge {:gap "10px"} props)))
+    [box :gap "10px" :children (into [props] children)]))
 
 (def v-box (partial hv-box rc/v-box))
 (def h-box (partial hv-box rc/h-box))

@@ -1,3 +1,4 @@
+^{:open-url "http://localhost:8080/"}
 {:main clue.client.core
  :output-to "target/cljs/public/js/main.js"
  :output-dir "target/cljs/public/js/"}

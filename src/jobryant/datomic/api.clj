@@ -1,7 +1,7 @@
 (ns jobryant.datomic.api
   (:refer-clojure :exclude [sync filter])
   (:require [jobryant.util :as u]
-            [jobryant.datomic.util :refer [ref?]]
+            [jobryant.datomic.util :refer [ref? expand-schema]]
             [datomic.api :as d]
             [clojure.java.io :refer [reader writer]]
             [me.raynes.fs :as fs]
@@ -9,15 +9,16 @@
 
 (u/pullall datomic.api)
 
-(def ^:private storage (atom nil))
+(declare ^:private storage)
 
 (defn storage-path! [path]
-  (reset! storage path))
+  (def storage path))
 
 (defn transact
   ([conn tx-data]
-   (with-open [wrtr (writer @storage :append true)]
-     (transact conn tx-data wrtr)))
+   (future
+     (with-open [wrtr (writer storage :append true)]
+       @(transact conn tx-data wrtr))))
   ([conn tx-data wrtr]
    (let [result (d/transact conn tx-data)]
      (future
@@ -53,12 +54,16 @@
       (update :eids merge (:tempids result))
       (assoc :db (:db-after result))))
 
-(defn connect [db-uri]
+(defn connect [db-uri schema data]
   (d/delete-database db-uri)
   (d/create-database db-uri)
   (let [conn (d/connect db-uri)
         tmp-storage (fs/temp-file "jobryant-datomic-api")]
-    (with-open [rdr (reader @storage)
+    (doseq [tx [(expand-schema schema) data]]
+      @(d/transact conn (conj tx
+                              {:db/id "datomic.tx"
+                               :db/txInstant #inst "2000-01-01T00:00:00.000-00:00"})))
+    (with-open [rdr (reader storage)
                 wrtr (writer tmp-storage)]
       (reduce
         (fn [info line]
@@ -67,5 +72,5 @@
             (update-info info result)))
         {:db (d/db conn)}
         (line-seq rdr)))
-    (u/move tmp-storage @storage)
+    (u/move tmp-storage storage)
     conn))

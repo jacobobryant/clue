@@ -42,9 +42,10 @@
   (mount/start)
   :ready)
 
-(defn reset []
-  (mount/stop)
-  (tn/refresh :after 'clue.repl/go))
+(defmacro reset []
+  `(do (mount/stop)
+       (tn/refresh :after 'clue.repl/go)
+       (use 'clojure.repl)))
 
 (def test-state
   (assoc (t/mock-initial-state [\r \g \y] (repeat 3 (:ai p/config)))
