@@ -3,8 +3,9 @@
 
 (def characters #{:scarlet :mustard :peacock :green :plum :white})
 (def weapons #{:knife :lead-pipe :candlestick :rope :revolver :wrench})
-(def rooms #{:study :hall :lounge :dining-room :kitchen
-             :ballroom :conservatory :billiard-room :library})
+(def rooms-vec [:study :hall :lounge :dining-room :kitchen
+                :ballroom :conservatory :billiard-room :library])
+(def rooms (set rooms-vec))
 
 (def raw-board
   ["              -                 r"
@@ -44,3 +45,26 @@
    :mustard \m
    :peacock \b
    :plum \p})
+
+(def card-names
+  {:scarlet "Miss Scarlet"
+   :mustard "Colonel Mustard"
+   :peacock "Mrs. Peacock"
+   :green "Mr. Green"
+   :plum "Mr. Plum"
+   :white "Mrs. White"
+   :knife "Knife"
+   :lead-pipe "Lead pipe"
+   :candlestick "Candlestick"
+   :rope "Rope"
+   :revolver "Revolver"
+   :wrench "Wrench"
+   :study "Study"
+   :hall "Hall"
+   :lounge "Lounge"
+   :dining-room "Dining room"
+   :kitchen "Kitchen"
+   :ballroom "Ballroom"
+   :conservatory "Conservatory"
+   :billiard-room "Billiard room"
+   :library "Library"})

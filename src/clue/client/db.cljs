@@ -15,7 +15,13 @@
 (def game-id (reaction (:game/id @game)))
 (def players (reaction (:game/players @game)))
 (def can-start-game? (reaction (<= 2 (count @players))))
-(def player-data (reaction (:game/player-data @game)))
-(def player-locations (reaction (->> @player-data
+(def all-player-data (reaction (:game/player-data @game)))
+(def player-locations (reaction (->> @all-player-data
                                      (map (juxt :player/character :player/location))
                                      (into {}))))
+(def player-data (reaction (first (filter #(= (:player/name %) @username) @all-player-data))))
+(def hand (reaction (:player/hand @player-data)))
+; do face up cards
+(def player-characters (reaction (->> @all-player-data
+                                      (map (juxt :player/name :player/character))
+                                      (into {}))))

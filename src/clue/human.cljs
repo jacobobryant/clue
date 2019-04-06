@@ -73,16 +73,6 @@
 ;              (println "Invalid input")
 ;              (read-location)))))
 
-(defn-spec cardstr string?
-  [cards ::c/cards]
-  (str/join ", " (map c/name-of cards)))
-
-(defn-spec print-cards any?
-  [state ::c/state]
-  (->> state c/current-player-data ::c/cards cardstr
-       (println "Your cards:"))
-  (when-let [face-up-cards (::c/face-up-cards state)]
-    (println "Face-up cards:" (cardstr face-up-cards))))
 
 (defn print-rooms []
   (println "Rooms:"
@@ -94,22 +84,6 @@
 ;  (apply printf message args)
 ;  (flush)
 ;  (read-line))
-
-(defn clear []
-  (doall (repeatedly 50 println)))
-
-(defn-spec print-state any?
-  [state ::c/state]
-  (clear)
-  (print-rooms)
-  (print-cards state)
-  (println)
-  (->> state
-       c/get-players
-       (u/map-from #(c/location-of % state))
-       current-board
-       print-game-board)
-  (println))
 
 ;(defn-spec get-choice any?
 ;  {:fn #(some #{(:ret %)} (-> % :args :choices))}
