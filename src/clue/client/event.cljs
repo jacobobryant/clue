@@ -9,7 +9,6 @@
 
 (defn leave-game! []
   (let [game-id @db/game-id]
-    (swap! db dissoc :game)
     (send! [:clue/tx [:clue.backend.tx/leave-game game-id]])))
 
 (defn join-game! [game-id]

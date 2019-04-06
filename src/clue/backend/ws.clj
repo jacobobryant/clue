@@ -15,8 +15,8 @@
 (let [{:keys [ch-recv send-fn connected-uids
               ajax-post-fn ajax-get-or-ws-handshake-fn]}
       (sente/make-channel-socket!
-        (get-sch-adapter) {:user-id-fn :client-id
-                           #_(fn [event]
+        (get-sch-adapter) {:user-id-fn 
+                           (fn [event]
                                (u/capture event)
                                {:client-id (:client-id event)
                                 :username (username event)})})]
@@ -50,15 +50,18 @@
   :stop (ws-router-stop-fn))
 
 (defmethod handler :chsk/uidport-open [event]
-  (let [_username (username event)]
+  (let [_username (username event)
+        db (d/db conn)]
     (chsk-send! (:uid event) [:db/merge {:username _username
-                                         :new-games (q/new-games (d/db conn))}])))
+                                         :new-games (q/new-games db)
+                                         :game (q/game db _username)}])))
 
-(defn broadcast-new-games! []
-  ; exclude people in started games
-  (let [games (q/new-games (d/db conn))]
+(defn broadcast-state! []
+  (let [db (d/db conn)
+        games (q/new-games db)]
     (doseq [uid (:any @*connected-uids)]
-      (chsk-send! uid [:db/merge {:new-games games}]))))
+      (chsk-send! uid [:db/merge {:new-games games
+                                  :game (q/game db (:username uid))}]))))
 
 ; move this to tx fn
 ; then make it so you can specify if the fn should be atomic or not/what parts of the fn should be atomic
@@ -68,8 +71,8 @@
                       :game/id (u/rand-str 4)
                       :game/players [(username event)]
                       :game/status :game.status/new}])
-  (broadcast-new-games!))
+  (broadcast-state!))
 
 (defmethod handler :clue/tx [{[fn-keyword & args] :?data :as event}]
   @(d/transact conn [(into [fn-keyword (username event)] args)])
-  (broadcast-new-games!))
+  (broadcast-state!))

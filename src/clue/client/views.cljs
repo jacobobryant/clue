@@ -4,6 +4,8 @@
             [clue.client.color :as color]
             [clue.client.db :as db :refer [db]]
             [clue.client.event :as event]
+            [clue.core :as core]
+            [clue.human :as human]
             [clojure.string :refer [join]]))
 
 (defn header-title [label level]
@@ -88,6 +90,9 @@
    [rc/title
     :label (str "Game ID: " @db/game-id)
     :level :level2]
+   [:pre
+    (with-out-str
+      (human/print-game-board (human/current-board @db/player-locations)))]
    [rc/button
     :label "Quit"
     :on-click event/quit!]])

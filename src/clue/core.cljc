@@ -1,18 +1,15 @@
 (ns clue.core
   "Game logic utilities common to all clients"
-  (:gen-class)
   (:require [clojure.string :as str]
-            [clojure.java.io :as io]
             [clojure.spec.alpha :as s]
             [clojure.set :refer [intersection union difference]]
             [orchestra.core :refer [defn-spec]]
-            [jobryant.util :as u]))
+            [jobryant.util :as u]
+            [clue.info :as info]))
 
 ; TODO consider reorganizing this file
 
-(def board (-> (slurp (io/resource "board.txt"))
-               (str/split #"\n")
-               (->> (remove #(empty? (str/trim %))))))
+(def board (remove #(empty? (str/trim %)) info/raw-board))
 (def raw-board-width (count (reduce #(max-key count %1 %2) board)))
 (def board-width (quot (inc raw-board-width) 2))
 (def player-names {\r "Miss Scarlet"
@@ -320,3 +317,7 @@
 (defn-spec hand-size int?
   [state ::state]
   (count (::cards (current-player-data state))))
+
+(defn-spec starting-location ::location
+  [character info/characters]
+  (-> character clue.info/character-chars board-inverse first))

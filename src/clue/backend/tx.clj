@@ -1,7 +1,9 @@
 (ns clue.backend.tx
   (:require [datomic.api :as d]
             [clue.backend.query :as q]
-            [clue.info :as info]))
+            [clue.info :as info]
+            [clue.core :as core]
+            [jobryant.util :as u]))
 
 ; add datomic rule predicates + convenient system for saying "this set of
 ; predicates (with these arguments) must pass"
@@ -40,6 +42,7 @@
                    (map set))
         face-up-cards (drop (* hand-size (count players)) deck)
         player-data (map vector players (shuffle info/characters) hands)]
+    (u/capture player-data)
     [{:game/id game-id
       :game/status :game.status/ongoing
       :game/turn 0
@@ -49,7 +52,7 @@
                           {:player/name player
                            :player/character character
                            :player/hand hand
-                           :player/location (pr-str (info/starting-location character))})}]))
+                           :player/location (pr-str (core/starting-location character))})}]))
 
 (defn quit-game [db username]
   ; replace with ai instead of deleting whole game

@@ -34,6 +34,7 @@
   (= :db.type/ref (:value-type (d/attribute db attr))))
 
 (defn expand-tx-fns [ns-sym]
+  (require ns-sym)
   (for [[fnsym fnvar] (ns-publics ns-sym)
         :let [params (-> fnvar meta :arglists first)]]
     {:db/ident (-> fnvar symbol keyword)
