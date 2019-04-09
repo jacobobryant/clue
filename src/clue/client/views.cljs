@@ -91,15 +91,15 @@
    [rc/title
     :label (str "Game ID: " @db/game-id)
     :level :level2]
-   [:pre {:style {:background-color "black"
-                  :color "white"}}
-    (with-out-str
-      (human/print-game-board (human/current-board @db/player-locations)))]
    [:p "Players: " (join ", "
                          (for [[player character] @db/player-characters]
                            (str player " (" (info/card-names character) ")")))]
    [:p (with-out-str (human/print-rooms))]
    [:p "Your hand: " (join ", " (map info/card-names @db/hand))]
+   [:pre {:style {:background-color "black"
+                  :color "white"}}
+    (with-out-str
+      (human/print-game-board (human/current-board @db/player-locations)))]
    [rc/button
     :label "Quit"
     :on-click event/quit!]])

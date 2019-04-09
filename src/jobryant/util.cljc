@@ -1,4 +1,5 @@
 (ns jobryant.util
+  (:require [clojure.walk :refer [postwalk]])
   #?(:cljs (:require-macros jobryant.util)))
 
 #?(:clj (do
@@ -66,6 +67,29 @@
     #(update %1 (if (f %2) 0 1) conj %2)
     [nil nil]
     coll))
+
+(defn deep-merge [& ms]
+  (apply
+    merge-with
+    (fn [x y]
+      (cond (map? y) (deep-merge x y)
+            :else y))
+    ms))
+
+(defn remove-nil-empty [m]
+  (into {} (remove (fn [[k v]]
+                     (or (nil? v)
+                         (and (coll? v) (empty? v)))) m)))
+
+(defn remove-nils [m]
+  (into {} (remove (comp nil? second) m)))
+
+(defn deep-merge-some [& ms]
+  (postwalk (fn [x]
+              (if (map? x)
+                (remove-nil-empty x)
+                x))
+            (apply deep-merge ms)))
 
 (defn merge-some [& ms]
   (reduce

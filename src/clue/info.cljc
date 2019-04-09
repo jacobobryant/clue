@@ -42,7 +42,7 @@
   {:scarlet \r
    :green \g
    :white \w
-   :mustard \m
+   :mustard \y
    :peacock \b
    :plum \p})
 

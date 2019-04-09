@@ -10,10 +10,13 @@
 (def schema
   {:game/id [:db.type/string :db.unique/identity]
    :game/players [:db.type/string :db.cardinality/many]
-   :game/status [:db.type/ref]
-   :game.status/new []
-   :game.status/ongoing []
-   :game.status/done []
+   :game/state [:db.type/ref]
+   :game.state/new []
+   :game.state/start-turn []
+   :game.state/post-roll-dice []
+   :game.state/make-suggestion []
+   :game.state/show-card []
+   :game.state/done []
 
    :game/player-data [:db.type/ref :db.cardinality/many :db/isComponent]
    :game/turn [:db.type/long]
@@ -29,7 +32,8 @@
    :suggestion/suggester [:db.type/string]
    :suggestion/cards [:db.type/keyword :db.cardinality/many]
    :suggestion/responder [:db.type/string]
-   :suggestion/response [:db.type/keyword]})
+   :suggestion/response [:db.type/keyword]
+   })
 
 (def data
   [])

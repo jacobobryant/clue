@@ -3,6 +3,7 @@
             [reagent.core :as r]
             [clue.client.views :as views]
             [clue.client.ws]
+            [clue.client.event :as event]
             [goog.events :as events]
             [goog.history.EventType :as EventType]
             [reitit.frontend :refer [router]]
@@ -21,7 +22,8 @@
       #(reset! nav-state %)
       {:use-fragment false})
     (when-let [el (gdom/getElement "app")]
-      (r/render [views/main nav-state] el))))
+      (r/render [views/main nav-state] el))
+    (event/init!)))
 
 (defn ^:export -main [& args]
   (init!))
