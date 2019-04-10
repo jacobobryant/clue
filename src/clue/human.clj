@@ -92,7 +92,7 @@
   (read-line))
 
 (defn clear []
-  (doall (repeatedly 50 println)))
+  (doall (repeatedly 100 println)))
 
 (defn-spec print-state any?
   [state ::c/state]
