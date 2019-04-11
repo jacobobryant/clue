@@ -46,93 +46,71 @@
            ch-chsk event-msg-handler)
   :stop (ws-router-stop-fn))
 
-(defmethod handler :clue/init [event]
-  (let [_username (username event)
-        db (d/db conn)
-        game (q/game db _username)
-        payload (conj {:username _username}
-                      (if game
-                        [:game game]
-                        [:new-games (q/new-games db)]))]
-    (chsk-send! (:uid event) [:db/reset (u/remove-nils payload)])))
+; To improve performance, we could have a separate function for updating a game
+; that only includes the information that can change.
+(defn broadcast-state! [db usernames]
+  (let [new-games (delay (q/new-games db))]
+    (doseq [uid usernames]
+      (let [game (q/game db uid)
+            payload (conj {:username uid}
+                          (if game
+                            [:game game]
+                            [:new-games @new-games]))]
+        (chsk-send! uid [:db/reset (u/remove-nils payload)])))))
 
-(defn broadcast-state! []
-  (let [db (d/db conn)
-        games (q/new-games db)]
-    (doseq [uid (:any @*connected-uids)]
-      (chsk-send! uid [:db/merge {:new-games games
-                                  :game (q/game db (:username uid))}]))))
+(defmethod handler :clue/init [event]
+  (broadcast-state! (d/db conn) [(username event)]))
 
 (defmethod handler :clue/new-game [event]
   (let [_username (username event)
         game-id (u/rand-str 4)
         tx [[:clue.backend.tx/create-game _username game-id]]
         db (:db-after @(d/transact conn tx))
-        sente-event [:clue/new-game {:username _username :game-id game-id}]
         uids (conj (q/in-lobby db (:any @*connected-uids)) _username)]
-    (u/capture event _username game-id tx db sente-event uids)
-    (doseq [uid uids]
-      (chsk-send! uid sente-event))))
+    (broadcast-state! db uids)))
 
 (defmethod handler :clue/leave-game [event]
   (let [_username (username event)
         {:keys [db-after db-before tx-data]} @(d/transact conn [[:clue.backend.tx/leave-game _username]])
-        game-eid (-> tx-data second .e)
-        game-id (:game/id (d/entity db-before game-eid))
-        remove-game? (not (du/exists? db-after game-eid))
+        game-id (q/game-id db-before _username)
         lobby-uids (q/in-lobby db-before (:any @*connected-uids))
         game-uids (q/players db-after game-id)
-        lobby-event (if remove-game?
-                      [:lobby/remove-game game-id]
-                      [:lobby/leave-game [game-id _username]])]
-    (chsk-send! _username [:self/leave-game (q/new-games db-after)])
-    (doseq [uid game-uids]
-      (chsk-send! uid [:game/leave-game _username]))
-    (doseq [uid lobby-uids]
-      (chsk-send! uid lobby-event))))
+        uids (concat [_username] game-uids lobby-uids)]
+    (broadcast-state! db-after uids)))
 
 (defmethod handler :clue/join-game [{game-id :?data :as event}]
   (let [_username (username event)
         {:keys [db-after db-before]}
         @(d/transact conn [[:clue.backend.tx/join-game _username game-id]])
         lobby-uids (q/in-lobby db-after (:any @*connected-uids))
-        game-uids (q/players db-before game-id)]
-    (chsk-send! _username [:self/join-game (q/game db-after _username)])
-    (doseq [uid lobby-uids]
-      (chsk-send! uid [:lobby/join-game [game-id _username]]))
-    (doseq [uid game-uids]
-      (chsk-send! uid [:game/join-game _username]))))
+        game-uids (q/players db-before game-id)
+        uids (concat [_username] game-uids lobby-uids)]
+    (broadcast-state! db-after uids)))
 
 (defmethod handler :clue/start-game [event]
   (let [_username (username event)
         {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/start-game _username]])
         players (q/players-from-username db-after _username)]
-    (doseq [player players]
-      (chsk-send! player [:game/start (q/game db-after player)]))))
+    (broadcast-state! db-after players)))
 
 (defmethod handler :clue/quit-game [event]
   (let [_username (username event)
         {:keys [db-after db-before]} @(d/transact conn [[:clue.backend.tx/quit-game _username]])
-        players (q/players-from-username db-before _username)
-        new-games (q/new-games db-after)]
-    (doseq [player players]
-      (chsk-send! player [:game/quit new-games]))))
+        players (q/players-from-username db-before _username)]
+    (broadcast-state! db-after players)))
 
 (defmethod handler :clue/roll [event]
   (let [_username (username event)
         {:keys [db-before db-after tx-data]} @(d/transact conn [[:clue.backend.tx/roll _username]])
-        players (q/players-from-username db-before _username)
-        roll (q/roll-from-user db-after _username)]
-    (doseq [player players]
-      (chsk-send! player [:game/roll roll]))))
+        players (q/players-from-username db-before _username)]
+    (broadcast-state! db-after players)))
 
 (defmethod handler :clue/move [{coordinates :?data :as event}]
   (let [_username (username event)
         coordinates (u/pred-> coordinates string? first)
-        {:keys [db-before tx-data]} @(d/transact conn [[:clue.backend.tx/move _username coordinates]])
-        players (q/players-from-username db-before _username)]
-    (doseq [player players]
-      (chsk-send! player [:game/move coordinates]))))
+        {:keys [db-after tx-data]} @(d/transact conn [[:clue.backend.tx/move _username coordinates]])
+        players (q/players-from-username db-after _username)]
+    (broadcast-state! db-after players)))
 
 ;(defmethod handler :clue/suggest [{[person weapon] :?data :as event}]
 ;  (let [_username (username event)

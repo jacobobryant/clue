@@ -130,8 +130,8 @@
       :game.state/start-turn [rc/button
                               :label "Roll dice"
                               :on-click event/roll!]
-      :game.state/post-roll move
-      :game.state/make-suggestion suggest)
+      :game.state/post-roll [move]
+      :game.state/make-suggestion [suggest])
     [rc/p "It's " @db/current-player "'s turn."]))
 
 (defn static-info []
@@ -147,7 +147,6 @@
                  :color "white"}}
    (with-out-str
      (human/print-game-board (human/current-board @db/player-locations)))])
-
 
 (defn ongoing-game []
   [rc/v-box

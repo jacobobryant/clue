@@ -37,9 +37,34 @@
          [?game :game/players ?player]]
        db username))
 
+(defn turn [db game-id]
+  (:game/turn (d/pull db [:game/turn] [:game/id game-id])))
+
+(defn current-character [db game-id]
+  (let [players (players db game-id)
+        characters (set (d/q '[:find [?character ...] :in $ ?game :where
+                               [?game :game/player-data ?player]
+                               [?player :player/character ?character]]
+                             db [:game/id game-id]))
+        characters (filter characters info/sorted-characters)
+        turn (mod (turn db game-id) (count characters))]
+    (nth characters turn)))
+
+(defn current-player
+  ([db game-id]
+   (current-player db game-id (current-character db game-id)))
+  ([db game-id current-character]
+   (d/q '[:find ?name . :in $ ?game ?character :where
+          [?game :game/player-data ?player]
+          [?player :player/character ?character]
+          [?player :player/name ?name]]
+        db [:game/id game-id] current-character)))
+
 (defn game [db username]
-  (some-> (d/q '[:find (pull ?game [* {:game/state [:db/ident]}]) . :in $ ?username :where
-                 [?game :game/players ?username]] db username)
+  (when-some [game-id (game-id db username)]
+    (let [current-character (current-character db game-id)
+          current-player (current-player db game-id current-character)]
+      (-> (d/pull db '[* {:game/state [:db/ident]}] [:game/id game-id])
           (dissoc :game/solution :db/id)
           (update :game/player-data
                   #(->> (for [data %]
@@ -57,30 +82,14 @@
                        (dissoc :suggestion/response)
                        true (dissoc :db/id))))
           (update :game/state :db/ident)
-          (update :game/players set)))
+          (update :game/players set)
+          (assoc :game/current-character current-character)
+          (assoc :game/current-player current-player)))))
 
 (defn in-lobby [db usernames]
   (d/q '[:find [?username ...] :in $ [?username ...] :where
          (not [_ :game/players ?username])]
        db usernames))
-
-(defn turn [db game-id]
-  (:game/turn (d/pull db [:game/turn] [:game/id game-id])))
-
-(defn current-player [db game-id]
-  (let [players (players db game-id)
-        characters (set (d/q '[:find [?character ...] :in $ ?game :where
-                               [?game :game/player-data ?player]
-                               [?player :player/character ?character]]
-                             db [:game/id game-id]))
-        characters (filter characters info/sorted-characters)
-        turn (mod (turn db game-id) (count characters))
-        current-character (nth characters turn)]
-    (d/q '[:find ?name . :in $ ?game ?character :where
-           [?game :game/player-data ?player]
-           [?player :player/character ?character]
-           [?player :player/name ?name]]
-         db [:game/id game-id] current-character)))
 
 (defn location [db username]
   (-> (d/pull db [:player/location] [:player/name username])

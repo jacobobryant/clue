@@ -23,7 +23,8 @@
   (send! [:clue/quit-game nil]))
 
 (defn roll! []
-  (send! [:clue/roll nil]))
+  (send! [:clue/roll nil])
+  nil)
 
 (defn move! [coordinates]
   (send! [:clue/move coordinates]))
