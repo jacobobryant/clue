@@ -1,8 +1,11 @@
 (ns clue.info
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [jobryant.util :as u]))
 
-(def characters #{:scarlet :mustard :peacock :green :plum :white})
-(def weapons #{:knife :lead-pipe :candlestick :rope :revolver :wrench})
+(def sorted-characters [:scarlet :mustard :peacock :green :plum :white])
+(def characters (set sorted-characters))
+(def weapons-vec [:knife :lead-pipe :candlestick :rope :revolver :wrench])
+(def weapons (set weapons-vec))
 (def rooms-vec [:study :hall :lounge :dining-room :kitchen
                 :ballroom :conservatory :billiard-room :library])
 (def rooms (set rooms-vec))
@@ -68,3 +71,14 @@
    :conservatory "Conservatory"
    :billiard-room "Billiard room"
    :library "Library"})
+
+(def rooms-map
+  (into {} (map vector (map #(char (+ 48 %)) (range 10)) rooms-vec)))
+
+(defn parse-coordinates [s]
+  (let [[_ _ room coordinate] (re-matches #"((\d)|([a-z]\d+))" s)]
+    (cond
+      room (first s)
+      coordinate (let [col (- (u/ord (first s)) (u/ord \a))
+                       row (dec (u/parse-int (subs s 1)))]
+                   [row col]))))

@@ -3,7 +3,7 @@
   (:require [clojure.string :as str]
             [clojure.spec.alpha :as s]
             [clojure.set :refer [intersection]]
-            [orchestra.core :refer [defn-spec]]
+            [orchestra.core :refer-macros [defn-spec]]
             [clue.core :as c]
             [clue.type :as t]
             [clue.info :as info]

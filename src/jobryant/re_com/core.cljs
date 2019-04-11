@@ -8,7 +8,7 @@
                 align-style horizontal-pill-tabs row-button popover-border border
                 modal-panel start-tour alert-list p input-textarea h-split
                 slider make-tour make-tour-nav flex-flow-style progress-bar
-                selection-list input-text scroller radio-button checkbox p-span
+                selection-list scroller radio-button checkbox p-span
                 button close-button box alert-box datepicker input-password
                 typeahead info-button vertical-bar-tabs justify-style
                 popover-content-wrapper title flex-child-style
@@ -29,3 +29,9 @@
 
 (defn grow []
   [:div {:style {:flex-grow 1}}])
+
+(defn input-text [& {:keys [model transform] :or {transform identity} :as props}]
+  (into [rc/input-text]
+        (apply concat (merge {:on-change #(reset! model (transform %))
+                              :change-on-blur? (not (contains? props :transform))}
+                             (dissoc props :transform)))))

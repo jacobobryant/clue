@@ -1,6 +1,6 @@
 (ns clue.client.ws
   (:require [taoensso.sente :as sente]
-            [clue.client.db :refer [db]]
+            [clue.client.db :as db :refer [db]]
             [jobryant.util :as u]))
 
 (defmulti handler :id)
@@ -66,3 +66,21 @@
   (swap! db #(-> %
                  (dissoc :game)
                  (assoc :new-games new-games))))
+
+(defmethod recv-handler :game/roll [{roll :data}]
+  (swap! db #(-> %
+                 (assoc-in [:game :game/roll] roll)
+                 (assoc-in [:game :game/state] :game.state/post-roll))))
+
+(defmethod recv-handler :game/move [{coordinates :data}]
+  (let [current-character @db/current-character
+        next-state (if (vector? coordinates)
+                     :game.state/start-turn
+                     :game.state/make-suggestion)
+        next-turn? (= next-state :game.state/start-turn)
+        turn (cond-> @db/turn next-turn? inc)]
+    (swap! db #(-> %
+                   (assoc-in [:game :game/player-data current-character :player/location]
+                             coordinates)
+                   (assoc-in [:game :game/turn] turn)
+                   (assoc-in [:game :game/state] next-state)))))

@@ -117,3 +117,27 @@
         new-games (q/new-games db-after)]
     (doseq [player players]
       (chsk-send! player [:game/quit new-games]))))
+
+(defmethod handler :clue/roll [event]
+  (let [_username (username event)
+        {:keys [db-before db-after tx-data]} @(d/transact conn [[:clue.backend.tx/roll _username]])
+        players (q/players-from-username db-before _username)
+        roll (q/roll-from-user db-after _username)]
+    (doseq [player players]
+      (chsk-send! player [:game/roll roll]))))
+
+(defmethod handler :clue/move [{coordinates :?data :as event}]
+  (let [_username (username event)
+        coordinates (u/pred-> coordinates string? first)
+        {:keys [db-before tx-data]} @(d/transact conn [[:clue.backend.tx/move _username coordinates]])
+        players (q/players-from-username db-before _username)]
+    (doseq [player players]
+      (chsk-send! player [:game/move coordinates]))))
+
+;(defmethod handler :clue/suggest [{[person weapon] :?data :as event}]
+;  (let [_username (username event)
+;        {:keys [db-before db-after tx-data]} @(d/transact conn [[:clue.backend.tx/suggest _username person weapon]])
+;        players (q/players-from-username db-before _username)
+;        game-id (q/game-id db-before _username)]
+;    (doseq [player players]
+;      (chsk-send! player [:game/suggest {:state (q/game-state db game-id)

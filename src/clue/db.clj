@@ -13,7 +13,7 @@
    :game/state [:db.type/ref]
    :game.state/new []
    :game.state/start-turn []
-   :game.state/post-roll-dice []
+   :game.state/post-roll []
    :game.state/make-suggestion []
    :game.state/show-card []
    :game.state/done []
@@ -23,9 +23,10 @@
    :game/solution [:db.type/keyword :db.cardinality/many]
    :game/suggestions [:db.type/ref :db.cardinality/many :db/isComponent]
    :game/face-up-cards [:db.type/keyword :db.cardinality/many]
+   :game/roll [:db.type/long]
 
    :player/name [:db.type/string :db.unique/identity]
-   :player/character [:db.type/keyword :db.unique/identity]
+   :player/character [:db.type/keyword]
    :player/location [:db.type/string]
    :player/hand [:db.type/keyword :db.cardinality/many]
 

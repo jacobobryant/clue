@@ -64,6 +64,59 @@
 
 (defn quit-game [db username]
   ; replace with ai instead of deleting whole game
-  (let [game-id (q/game-id db username :game.state/start-turn)]
+  ; make sure the game is ongoing
+  (let [game-id (q/game-id db username)]
     (assert (some? game-id))
     [[:db.fn/retractEntity [:game/id game-id]]]))
+
+(defn roll [db username]
+  ; replace with ai instead of deleting whole game
+  (let [game-id (q/game-id db username :game.state/start-turn)]
+    (assert (some? game-id))
+    (assert (= username (q/current-player db game-id)))
+    [{:game/id game-id
+      :game/roll (core/roll-dice)
+      :game/state :game.state/post-roll}]))
+
+(defn move [db username destination]
+  (let [source (q/location db username)
+        game-id (q/game-id db username :game.state/post-roll)
+        _ (assert (some? game-id))
+        _ (assert (= username (q/current-player db game-id)))
+        roll (q/roll db game-id)
+        next-state (if (vector? destination)
+                     :game.state/start-turn
+                     :game.state/make-suggestion)
+        next-turn? (= next-state :game.state/start-turn)]
+    (assert (core/valid-move?' source destination roll))
+    [(cond-> {:game/id game-id
+              :game/state next-state}
+       next-turn? (assoc :game/turn (inc (q/turn db game-id))))
+     {:player/name username
+      :player/location (pr-str destination)}]))
+
+(defn suggest [db username person weapon]
+  (let [game-id (q/game-id db username :game.state/make-suggestion)
+        _ (assert (some? game-id))
+        _ (assert (= username (q/current-player db game-id)))
+        room (info/rooms-map (q/location db username))
+        solution #{person weapon room}
+        _ (assert (some? room))
+        responders (q/responders db username)
+        character (q/character db username)
+        responder (some->> info/sorted-characters
+                           (split-with #(not= character %))
+                           reverse flatten rest
+                           (filter responders)
+                           first
+                           (q/username db game-id))
+        next-state (if (some? responder)
+                     :game.state/show-card
+                     :game.state/start-turn)]
+    [(cond-> {:game/id game-id
+              :game/suggestions (u/assoc-some
+                                  {:suggestion/suggester username
+                                   :suggestion/cards solution}
+                                  :suggestion/responder responder)
+              :game/state next-state}
+       (nil? responder) (assoc :game/turn (inc (q/turn db game-id))))]))

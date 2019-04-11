@@ -1,7 +1,8 @@
 (ns clue.client.db
   (:require [reagent.core :as r]
             [reagent.ratom :refer-macros [reaction]]
-            [clojure.pprint :refer [pprint]]))
+            [clojure.pprint :refer [pprint]]
+            [clue.info :as info]))
 
 (defonce db (r/atom nil))
 (def username (reaction (:username @db)))
@@ -17,12 +18,25 @@
 (def players (reaction (:game/players @game)))
 (def can-start-game? (reaction (<= 2 (count @players))))
 (def all-player-data (reaction (:game/player-data @game)))
-(def player-locations (reaction (->> @all-player-data
+(def player-locations (reaction (->> (vals @all-player-data)
                                      (map (juxt :player/character :player/location))
                                      (into {}))))
-(def player-data (reaction (first (filter #(= (:player/name %) @username) @all-player-data))))
+(def player-data (reaction (first (filter #(= (:player/name %) @username) (vals @all-player-data)))))
 (def hand (reaction (:player/hand @player-data)))
 ; do face up cards
-(def player-characters (reaction (->> @all-player-data
+(def player-characters (reaction (->> (vals @all-player-data)
                                       (map (juxt :player/name :player/character))
                                       (into {}))))
+(def characters (reaction (set (map :player/character (vals @all-player-data)))))
+(def sorted-characters (reaction (filter @characters info/sorted-characters)))
+(def character->player (reaction (->> (vals @all-player-data)
+                                      (map (juxt :player/character :player/name))
+                                      (into {}))))
+(def turn (reaction (:game/turn @game)))
+(def num-players (reaction (count @players)))
+(def current-character (reaction (nth @sorted-characters (mod @turn @num-players))))
+(def current-player (reaction (@character->player @current-character)))
+(def your-turn? (reaction (= @current-player @username)))
+(def start-turn? (reaction (= @game-state :game.state/start-turn)))
+(def post-roll? (reaction (= @game-state :game.state/post-roll)))
+(def roll (reaction (:game/roll @game)))

@@ -1,11 +1,14 @@
 (ns clue.core
   "Game logic utilities common to all clients"
+  #?(:cljs
+     (:require-macros [orchestra.core :refer [defn-spec]]))
   (:require [clojure.string :as str]
             [clojure.spec.alpha :as s]
             [clojure.set :refer [intersection union difference]]
-            [orchestra.core :refer [defn-spec]]
             [jobryant.util :as u]
-            [clue.info :as info]))
+            [clue.info :as info]
+            #?(:clj
+               [orchestra.core :refer [defn-spec]])))
 
 ; TODO consider reorganizing this file
 
@@ -201,6 +204,11 @@
                                       set)]
     (and (contains? available destination)
          (not (other-player-coordinates destination)))))
+
+(defn valid-move?' [source destination roll]
+  (let [available (available-locations source roll)]
+    ; don't allow people on same spot
+    (boolean (available destination))))
 
 (defn-spec initial-state ::state
   [players ::players configs (s/coll-of ::config)]

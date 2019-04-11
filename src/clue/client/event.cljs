@@ -5,7 +5,6 @@
 ; try to shorted tx fn keywords
 
 (defn init! []
-  (println "init")
   (send! [:clue/init nil]))
 
 (defn new-game! []
@@ -22,3 +21,12 @@
 
 (defn quit! []
   (send! [:clue/quit-game nil]))
+
+(defn roll! []
+  (send! [:clue/roll nil]))
+
+(defn move! [coordinates]
+  (send! [:clue/move coordinates]))
+
+(defn suggest! [person weapon]
+  (send! [:clue/suggest [person weapon]]))

@@ -1,5 +1,6 @@
 (ns clue.backend.query
-  (:require [datomic.api :as d]))
+  (:require [datomic.api :as d]
+            [clue.info :as info]))
 
 (defn game-id
   ([db username]
@@ -41,12 +42,14 @@
                  [?game :game/players ?username]] db username)
           (dissoc :game/solution :db/id)
           (update :game/player-data
-                  #(for [data %]
-                     (cond-> data
-                       (not= username (:player/name data))
-                       (dissoc :player/hand)
-                       true (update :player/location read-string)
-                       true (dissoc :db/id))))
+                  #(->> (for [data %]
+                          [(:player/character data)
+                           (cond-> data
+                             (not= username (:player/name data))
+                             (dissoc :player/hand)
+                             true (update :player/location read-string)
+                             true (dissoc :db/id))])
+                        (into {})))
           (update :game/suggestions
                   #(for [data %]
                      (cond-> data
@@ -60,3 +63,57 @@
   (d/q '[:find [?username ...] :in $ [?username ...] :where
          (not [_ :game/players ?username])]
        db usernames))
+
+(defn turn [db game-id]
+  (:game/turn (d/pull db [:game/turn] [:game/id game-id])))
+
+(defn current-player [db game-id]
+  (let [players (players db game-id)
+        characters (set (d/q '[:find [?character ...] :in $ ?game :where
+                               [?game :game/player-data ?player]
+                               [?player :player/character ?character]]
+                             db [:game/id game-id]))
+        characters (filter characters info/sorted-characters)
+        turn (mod (turn db game-id) (count characters))
+        current-character (nth characters turn)]
+    (d/q '[:find ?name . :in $ ?game ?character :where
+           [?game :game/player-data ?player]
+           [?player :player/character ?character]
+           [?player :player/name ?name]]
+         db [:game/id game-id] current-character)))
+
+(defn location [db username]
+  (-> (d/pull db [:player/location] [:player/name username])
+      :player/location
+      read-string))
+
+(defn roll [db game-id]
+  (:game/roll (d/pull db [:game/roll] [:game/id game-id])))
+
+(defn roll-from-user [db username]
+  (d/q '[:find ?roll . :in $ ?username :where
+         [?game :game/players ?username]
+         [?game :game/roll ?roll]]
+       db username))
+
+(defn responders [db username solution]
+  (set
+    (d/q '[:find [?character ...] :in $ ?username [?card ...] :where
+           [?game :game/players ?username]
+           [?game :game/players ?other-user]
+           [(not= ?username ?other-user)]
+           [?game :game/player-data ?player-data]
+           [?player-data :player/name ?other-user]
+           [?player-data :player/hand ?card]
+           [?player-data :player/character ?character]]
+         db username solution)))
+
+(defn character [db username]
+  (:player/character (d/pull db [:player/character] [:player/name username])))
+
+(defn username [db game-id character]
+  (d/q '[:find ?username . :in $ ?game ?character :where
+         [?game :game/player-data ?player-data]
+         [?player-data :player/character ?character]
+         [?player-data :player/name ?username]]
+       db [:game/id game-id] character))

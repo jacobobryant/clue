@@ -7,6 +7,9 @@
 (defmacro capture [& xs]
   `(do ~@(for [x xs] `(def ~x ~x))))
 
+(defmacro forv [& body]
+  `(vec (for ~@body)))
+
 (defmacro condas->
   "Combination of as-> and cond->."
   [expr name & clauses]
@@ -14,6 +17,9 @@
   `(as-> ~expr ~name
      ~@(map (fn [[test step]] `(if ~test ~step ~name))
             (partition 2 clauses))))
+
+(defn pred-> [x f g]
+  (if (f x) (g x) x))
 
 (defmacro pullall [ns]
   `(do ~@(for [[sym var] (ns-publics ns)]
@@ -62,6 +68,9 @@
   (cond-> coll
     x (conj x)))
 
+(defn assoc-some [m k v]
+  (cond-> m (some? v) (assoc k v)))
+
 (defn split-by [f coll]
   (reduce
     #(update %1 (if (f %2) 0 1) conj %2)
@@ -100,9 +109,19 @@
           (apply dissoc x nil-keys))))
     ms))
 
+#?(:cljs
+(def char->int (into {} (map #(vector (char %) %) (range 256))))
+)
+
+(defn ord [c]
+  (#?(:clj int :cljs char->int) c))
+
+(defn parse-int [s]
+  (#?(:clj Integer/parseInt :cljs js/parseInt) s))
+
 ; Do this with algo.generic
 (defn cop [op & cs]
-  (char (apply op (map int cs))))
+  (char (apply op (map ord cs))))
 
 (defn c+ [& cs]
   (apply cop + cs))
