@@ -71,7 +71,7 @@
 
 (defmethod handler :clue/leave-game [event]
   (let [_username (username event)
-        {:keys [db-after db-before tx-data]} @(d/transact conn [[:clue.backend.tx/leave-game _username]])
+        {:keys [db-after db-before]} @(d/transact conn [[:clue.backend.tx/leave-game _username]])
         game-id (q/game-id db-before _username)
         lobby-uids (q/in-lobby db-before (:any @*connected-uids))
         game-uids (q/players db-after game-id)
@@ -101,21 +101,38 @@
 
 (defmethod handler :clue/roll [event]
   (let [_username (username event)
-        {:keys [db-before db-after tx-data]} @(d/transact conn [[:clue.backend.tx/roll _username]])
+        {:keys [db-before db-after]} @(d/transact conn [[:clue.backend.tx/roll _username]])
         players (q/players-from-username db-before _username)]
     (broadcast-state! db-after players)))
 
 (defmethod handler :clue/move [{coordinates :?data :as event}]
   (let [_username (username event)
         coordinates (u/pred-> coordinates string? first)
-        {:keys [db-after tx-data]} @(d/transact conn [[:clue.backend.tx/move _username coordinates]])
+        {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/move _username coordinates]])
         players (q/players-from-username db-after _username)]
     (broadcast-state! db-after players)))
 
-;(defmethod handler :clue/suggest [{[person weapon] :?data :as event}]
-;  (let [_username (username event)
-;        {:keys [db-before db-after tx-data]} @(d/transact conn [[:clue.backend.tx/suggest _username person weapon]])
-;        players (q/players-from-username db-before _username)
-;        game-id (q/game-id db-before _username)]
-;    (doseq [player players]
-;      (chsk-send! player [:game/suggest {:state (q/game-state db game-id)
+(defmethod handler :clue/suggest [{[person weapon] :?data :as event}]
+  (let [_username (username event)
+        {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/suggest _username person weapon]])
+        players (q/players-from-username db-after _username)]
+    (broadcast-state! db-after players)))
+
+(defmethod handler :clue/show-card [{card :?data :as event}]
+  (let [_username (username event)
+        {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/show-card _username card]])
+        players (q/players-from-username db-after _username)]
+    (broadcast-state! db-after players)))
+
+(defmethod handler :clue/end-turn [event]
+  (let [_username (username event)
+        {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/end-turn _username]])
+        players (q/players-from-username db-after _username)]
+    (broadcast-state! db-after players)))
+
+(defmethod handler :clue/accuse [{cards :?data :as event}]
+  (assert (= (count cards) 3))
+  (let [_username (username event)
+        {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/accuse _username cards]])
+        players (q/players-from-username db-after _username)]
+    (broadcast-state! db-after players)))

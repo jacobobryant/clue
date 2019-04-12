@@ -1,6 +1,7 @@
 (ns clue.backend.query
   (:require [datomic.api :as d]
-            [clue.info :as info]))
+            [clue.info :as info]
+            [jobryant.util :as u]))
 
 (defn game-id
   ([db username]
@@ -60,6 +61,13 @@
           [?player :player/name ?name]]
         db [:game/id game-id] current-character)))
 
+(defn responder [db game-id]
+  (d/q '[:find ?responder . :in $ ?game :where
+         [?game :game/suggestions ?sug]
+         (not [?sug :suggestion/response])
+         [?sug :suggestion/responder ?responder]]
+       db [:game/id game-id]))
+
 (defn game [db username]
   (when-some [game-id (game-id db username)]
     (let [current-character (current-character db game-id)
@@ -78,13 +86,15 @@
           (update :game/suggestions
                   #(for [data %]
                      (cond-> data
-                       (not= username (:suggestion/suggester data))
+                       (not (#{(:suggestion/suggester data) (:suggestion/responder data)} username))
                        (dissoc :suggestion/response)
-                       true (dissoc :db/id))))
+                       true (dissoc :db/id)
+                       true (update :suggestion/cards set))))
           (update :game/state :db/ident)
           (update :game/players set)
           (assoc :game/current-character current-character)
-          (assoc :game/current-player current-player)))))
+          (assoc :game/current-player current-player)
+          (u/assoc-some :game/responder (responder db game-id))))))
 
 (defn in-lobby [db usernames]
   (d/q '[:find [?username ...] :in $ [?username ...] :where
@@ -117,6 +127,12 @@
            [?player-data :player/character ?character]]
          db username solution)))
 
+(defn suggestion [db responder]
+  (d/q '[:find ?sug . :in $ ?responder :where
+         [?sug :suggestion/responder ?responder]
+         (not [?sug :suggestion/response])]
+       db responder))
+
 (defn character [db username]
   (:player/character (d/pull db [:player/character] [:player/name username])))
 
@@ -126,3 +142,17 @@
          [?player-data :player/character ?character]
          [?player-data :player/name ?username]]
        db [:game/id game-id] character))
+
+(defn response-valid? [db suggestion-eid card]
+  (boolean
+    (d/q '[:find ?card . :in $ ?sug ?card :where
+           [?sug :suggestion/cards ?card]
+           [?sug :suggestion/responder ?responder]
+           [?player-data :player/name ?responder]
+           [?player-data :player/hand ?card]]
+         db suggestion-eid card)))
+
+(defn correct? [db game-id cards]
+  (= 3 (d/q '[:find (count ?card) . :in $ ?game [?card ...] :where
+              [?game :game/solution ?card]]
+            db [:game/id game-id] cards)))

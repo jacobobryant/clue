@@ -1,5 +1,6 @@
 (ns clue.client.views
   (:require [reagent.core :as r]
+            [reagent.ratom :refer-macros [reaction]]
             [jobryant.re-com.core :as rc]
             [jobryant.util :as u]
             [clue.client.color :as color]
@@ -100,39 +101,96 @@
         :label "Move"
         :on-click #(event/move! (info/parse-coordinates @coordinates))]])))
 
+(defn select-cards [{:keys [all?]} model]
+  (reset! model [nil nil nil])
+  (let [info (cond-> [[info/sorted-characters "Person"]
+                      [info/weapons-vec "Weapon"]]
+               all? (conj [info/rooms-vec "Room"]))
+        dropdowns (u/forv [[i [choices placeholder]] (u/zip [(range) info])]
+                    [rc/single-dropdown
+                     :model (reaction (nth @model i))
+                     :choices (u/forv [c choices]
+                                {:id c :label (info/card-names c)})
+                     :placeholder placeholder
+                     :on-change #(swap! model assoc i %)
+                     :width "150px"
+                     :max-height "300px"])]
+    (fn [] (into [rc/h-box] dropdowns))))
+
 (defn suggest []
-  (let [[person-props weapon-props room-props :as props]
-        (for [[choices placeholder] [[info/sorted-characters "Person"]
-                                     [info/weapons-vec "Weapon"]]
-              :let [model (r/atom nil)]]
-          {:model model
-           :choices (u/forv [c choices]
-                            {:id c :label (info/card-names c)})
-           :placeholder placeholder
-           :on-change #(reset! model %)
-           :width "150px"
-           :max-height "300px"})]
-    (u/capture props)
+  (let [cards (r/atom nil)]
     (fn []
       [rc/v-box
        [rc/p "Make a suggestion:"]
        [rc/h-box
-        (into [rc/single-dropdown] (apply concat person-props))
-        (into [rc/single-dropdown] (apply concat weapon-props))
+        [select-cards {:all? false} cards]
         [rc/button
          :label "Make suggestion"
-         :disabled? (some (comp nil? deref :model) props)
-         :on-click #(apply event/suggest! (map (comp deref :model) props))]]])))
+         :disabled? (some nil? @cards)
+         :on-click #(apply event/suggest! @cards)]]])))
+
+(defn select-card []
+  (let [choices @db/possible-responses
+        model (r/atom (if (= 1 (count choices))
+                        (first choices)
+                        nil))]
+    (fn []
+      (vec (concat
+             [rc/h-box]
+             (for [c choices]
+               [rc/radio-button
+                :model model
+                :value c
+                :label (info/card-names c)
+                :on-change #(reset! model %)])
+             [[rc/button
+               :label "Show card"
+               :disabled? (nil? @model)
+               :on-click #(event/show-card! @model)]])))))
+
+(defn show-card []
+  (if (= @db/responder @db/username)
+    [rc/v-box
+     [rc/p @db/suggester " suggested "
+      (join ", " (map info/card-names @db/suggested-cards)) "."]
+     [select-card]]
+    [rc/p "Waiting for " @db/responder " to show "
+     (if (= @db/username @db/current-player) "you" @db/current-player)
+     " a card."]))
+
+(defn accuse []
+  (let [accusing? (r/atom false)
+        cards (r/atom nil)]
+    (fn []
+      (if @accusing?
+        [rc/h-box
+         [select-cards {:all? true} cards]
+         [rc/button
+          :label "Make accusation"
+          :on-click #(event/accuse! @cards)
+          :disabled? (some nil? @cards)]
+         [rc/button
+          :label "Cancel"
+          :on-click #(reset! accusing? false)]]
+        [rc/h-box
+         [rc/button
+          :label "End turn"
+          :on-click event/end-turn!]
+         [rc/button
+          :label "Make accusation"
+          :on-click #(reset! accusing? true)]]))))
 
 (defn turn-controls []
-  (if @db/your-turn?
-    (case @db/game-state
-      :game.state/start-turn [rc/button
-                              :label "Roll dice"
-                              :on-click event/roll!]
-      :game.state/post-roll [move]
-      :game.state/make-suggestion [suggest])
-    [rc/p "It's " @db/current-player "'s turn."]))
+  (cond
+    (some? @db/responder) [show-card]
+    @db/your-turn? (case @db/game-state
+                     :game.state/start-turn [rc/button
+                                             :label "Roll dice"
+                                             :on-click event/roll!]
+                     :game.state/post-roll [move]
+                     :game.state/make-suggestion [suggest]
+                     :game.state/accuse [accuse])
+    :default [rc/p "It's " @db/current-player "'s turn."]))
 
 (defn static-info []
   [rc/v-box

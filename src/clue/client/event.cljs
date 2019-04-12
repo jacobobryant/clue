@@ -2,8 +2,6 @@
   (:require [clue.client.ws :refer [send!]]
             [clue.client.db :as db :refer [db]]))
 
-; try to shorted tx fn keywords
-
 (defn init! []
   (send! [:clue/init nil]))
 
@@ -23,11 +21,19 @@
   (send! [:clue/quit-game nil]))
 
 (defn roll! []
-  (send! [:clue/roll nil])
-  nil)
+  (send! [:clue/roll nil]))
 
 (defn move! [coordinates]
   (send! [:clue/move coordinates]))
 
 (defn suggest! [person weapon]
   (send! [:clue/suggest [person weapon]]))
+
+(defn show-card! [card]
+  (send! [:clue/show-card card]))
+
+(defn end-turn! []
+  (send! [:clue/end-turn nil]))
+
+(defn accuse! [cards]
+  (send! [:clue/accuse cards]))

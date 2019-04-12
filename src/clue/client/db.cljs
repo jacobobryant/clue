@@ -33,3 +33,12 @@
 (def start-turn? (reaction (= @game-state :game.state/start-turn)))
 (def post-roll? (reaction (= @game-state :game.state/post-roll)))
 (def roll (reaction (:game/roll @game)))
+(def responder (reaction (:game/responder @game)))
+(def suggestions (reaction (:game/suggestions @game)))
+(def suggestion (reaction (->> @suggestions
+                               (filter #(and (= @username (:suggestion/responder %))
+                                             (not (contains? % :suggestion/response))))
+                               first)))
+(def suggester (reaction (:suggestion/suggester @suggestion)))
+(def suggested-cards (reaction (:suggestion/cards @suggestion)))
+(def possible-responses (reaction (filter (or @suggested-cards {}) @hand)))

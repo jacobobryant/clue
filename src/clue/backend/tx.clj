@@ -85,13 +85,11 @@
         _ (assert (= username (q/current-player db game-id)))
         roll (q/roll db game-id)
         next-state (if (vector? destination)
-                     :game.state/start-turn
-                     :game.state/make-suggestion)
-        next-turn? (= next-state :game.state/start-turn)]
+                     :game.state/accuse
+                     :game.state/make-suggestion)]
     (assert (core/valid-move?' source destination roll))
-    [(cond-> {:game/id game-id
-              :game/state next-state}
-       next-turn? (assoc :game/turn (inc (q/turn db game-id))))
+    [{:game/id game-id
+      :game/state next-state}
      {:player/name username
       :player/location (pr-str destination)}]))
 
@@ -102,7 +100,7 @@
         room (info/rooms-map (q/location db username))
         solution #{person weapon room}
         _ (assert (some? room))
-        responders (q/responders db username)
+        responders (q/responders db username solution)
         character (q/character db username)
         responder (some->> info/sorted-characters
                            (split-with #(not= character %))
@@ -112,11 +110,43 @@
                            (q/username db game-id))
         next-state (if (some? responder)
                      :game.state/show-card
-                     :game.state/start-turn)]
-    [(cond-> {:game/id game-id
-              :game/suggestions (u/assoc-some
-                                  {:suggestion/suggester username
-                                   :suggestion/cards solution}
-                                  :suggestion/responder responder)
-              :game/state next-state}
-       (nil? responder) (assoc :game/turn (inc (q/turn db game-id))))]))
+                     :game.state/accuse)]
+    [{:game/id game-id
+      :game/suggestions (u/assoc-some
+                          {:suggestion/suggester username
+                           :suggestion/cards solution}
+                          :suggestion/responder responder)
+      :game/state next-state}]))
+
+(defn show-card [db username card]
+  (let [game-id (q/game-id db username)
+        suggestion-eid (q/suggestion db username)
+        turn (q/turn db game-id)]
+    (assert (some? suggestion-eid))
+    (assert (q/response-valid? db suggestion-eid card))
+    [{:db/id suggestion-eid
+      :suggestion/response card}
+     {:game/id game-id
+      :game/state :game.state/accuse}]))
+
+(defn end-turn [db username]
+  (let [game-id (q/game-id db username)
+        turn (q/turn db game-id)]
+    (assert (= :game.state/accuse (q/game-state db game-id)))
+    (assert (= username (q/current-player db game-id)))
+    [{:game/id game-id
+      :game/state :game.state/start-turn
+      :game/turn (inc turn)}]))
+
+(defn accuse [db username cards]
+  (let [game-id (q/game-id db username)
+        turn (q/turn db game-id)
+        correct? (q/correct? db game-id cards)]
+    (assert (= :game.state/accuse (q/game-state db game-id)))
+    (assert (= username (q/current-player db game-id)))
+    [{:player/name username
+      :player/accusation cards}
+     (cond->
+       {:game/id game-id
+        :game/state (if correct? :game.state/done :game.state/start-turn)}
+       (not correct?) (assoc :game/turn (inc turn)))]))

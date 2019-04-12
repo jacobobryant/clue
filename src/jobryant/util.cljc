@@ -1,6 +1,9 @@
 (ns jobryant.util
-  (:require [clojure.walk :refer [postwalk]])
+  (:require [clojure.walk :refer [postwalk]]
+            [clojure.pprint])
   #?(:cljs (:require-macros jobryant.util)))
+
+(def pprint clojure.pprint/pprint)
 
 #?(:clj (do
 
