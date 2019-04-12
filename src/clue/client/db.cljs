@@ -12,8 +12,8 @@
 (def game (reaction (:game @db)))
 (def game-state (reaction (:game/state @game)))
 (def in-new-game? (reaction (= :game.state/new @game-state)))
-(def in-ongoing-game? (reaction (and (contains? @db :game)
-                                     (not (contains? #{:game.state/new :game.state/done} @game-state)))))
+(def in-ongoing-game? (reaction (not (contains? #{:game.state/new nil} @game-state))))
+(def game-done? (reaction (= :game.state/done @game-state)))
 (def game-id (reaction (:game/id @game)))
 (def players (reaction (:game/players @game)))
 (def can-start-game? (reaction (<= 2 (count @players))))
@@ -42,3 +42,7 @@
 (def suggester (reaction (:suggestion/suggester @suggestion)))
 (def suggested-cards (reaction (:suggestion/cards @suggestion)))
 (def possible-responses (reaction (filter (or @suggested-cards {}) @hand)))
+(def guessed-right (reaction (->> @all-player-data vals
+                                  (filter #(= (:player/accusation %) (:game/solution @game)))
+                                  first :player/name)))
+(def winner (reaction (:game/winner @game)))

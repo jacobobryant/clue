@@ -68,12 +68,33 @@
          [?sug :suggestion/responder ?responder]]
        db [:game/id game-id]))
 
+(defn winner [db game-id]
+  (let [accusers (d/q '[:find ?accuser ?card :in $ ?game :where
+                        [?game :game/player-data ?player-data]
+                        [?player-data :player/accusation ?card]
+                        [?player-data :player/name ?accuser]]
+                      db [:game/id game-id])
+        accusers (reduce (fn [m [k v]] (update m k conj v)) {} accusers)]
+    (or (ffirst (filter #(= 3 (count (second %))) accusers))
+        (d/q '[:find ?player . :in $ ?game :where
+               [?game :game/player-data ?player-data]
+               (not [?player-data :player/accusation])
+               [?player-data :player/name ?player]]
+             db [:game/id game-id]))))
+
+; from broadcast state, get the state once and only do filtering per person.
 (defn game [db username]
   (when-some [game-id (game-id db username)]
     (let [current-character (current-character db game-id)
           current-player (current-player db game-id current-character)]
       (-> (d/pull db '[* {:game/state [:db/ident]}] [:game/id game-id])
-          (dissoc :game/solution :db/id)
+          (update :game/state :db/ident)
+          (as-> x (if (= (:game/state x) :game.state/done)
+                    (-> x
+                        (update :game/solution set)
+                        (assoc :game/winner (winner db game-id)))
+                    (dissoc x :game/solution)))
+          (dissoc :db/id)
           (update :game/player-data
                   #(->> (for [data %]
                           [(:player/character data)
@@ -81,7 +102,8 @@
                              (not= username (:player/name data))
                              (dissoc :player/hand)
                              true (update :player/location read-string)
-                             true (dissoc :db/id))])
+                             true (dissoc :db/id)
+                             true (update :player/accusation set))])
                         (into {})))
           (update :game/suggestions
                   #(for [data %]
@@ -90,7 +112,6 @@
                        (dissoc :suggestion/response)
                        true (dissoc :db/id)
                        true (update :suggestion/cards set))))
-          (update :game/state :db/ident)
           (update :game/players set)
           (assoc :game/current-character current-character)
           (assoc :game/current-player current-player)
@@ -156,3 +177,9 @@
   (= 3 (d/q '[:find (count ?card) . :in $ ?game [?card ...] :where
               [?game :game/solution ?card]]
             db [:game/id game-id] cards)))
+
+(defn players-left [db game-id]
+  (d/q '[:find (count ?player) . :in $ ?game :where
+         [?game :game/player-data ?player-data]
+         (not [?player-data :player/accusation])]
+       db [:game/id game-id]))

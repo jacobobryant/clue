@@ -182,6 +182,10 @@
 
 (defn turn-controls []
   (cond
+    @db/game-done? [rc/p (if (= @db/username @db/winner)
+                           "You are"
+                           (str @db/winner " is"))
+                         " the winner."]
     (some? @db/responder) [show-card]
     @db/your-turn? (case @db/game-state
                      :game.state/start-turn [rc/button

@@ -141,12 +141,13 @@
 (defn accuse [db username cards]
   (let [game-id (q/game-id db username)
         turn (q/turn db game-id)
-        correct? (q/correct? db game-id cards)]
+        correct? (q/correct? db game-id cards)
+        game-over? (or correct? (= (q/players-left db game-id) 2))]
     (assert (= :game.state/accuse (q/game-state db game-id)))
     (assert (= username (q/current-player db game-id)))
     [{:player/name username
       :player/accusation cards}
      (cond->
        {:game/id game-id
-        :game/state (if correct? :game.state/done :game.state/start-turn)}
-       (not correct?) (assoc :game/turn (inc turn)))]))
+        :game/state (if game-over? :game.state/done :game.state/start-turn)}
+       (not game-over?) (assoc :game/turn (inc turn)))]))
