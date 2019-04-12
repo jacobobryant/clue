@@ -82,3 +82,43 @@
       coordinate (let [col (- (u/ord (first s)) (u/ord \a))
                        row (dec (u/parse-int (subs s 1)))]
                    [row col]))))
+
+(defn coordinate-text [coord]
+  (if (vector? coord)
+    (let [[row col] coord]
+      (str
+        (char (+ col (u/ord \a)))
+        (inc row)))
+    (card-names (rooms-map coord))))
+
+(defn pronoun
+  ([user you {:keys [capitalize?] :or {capitalize? false}}]
+   (if (= user you)
+     (cond-> "you" capitalize? str/capitalize)
+     user))
+  ([user you]
+   (pronoun user you {})))
+
+(def event-order (zipmap [:roll :move :suggest :show-card :accuse] (range)))
+
+(defn card-str [cards]
+  (str/join ", " (map card-names cards)))
+
+(defn event-text [event username]
+  (let [pro #(pronoun % username {:capitalize? true})]
+    (case (:event event)
+      :roll (str (pro (:user event)) " rolled a " (:roll event) ".")
+      :move (str (pro (:user event)) " moved to " (coordinate-text (:destination event)) ".")
+      :suggest (str (pro (:user event)) " suggested " (card-str (:cards event)) ".")
+      :show-card (str (pro (:responder event))
+                      " showed "
+                      (if (contains? #{(:suggester event) (:responder event)} username)
+                        (card-names (:card event))
+                        "a card")
+                      " to "
+                      (pronoun (:suggester event) username))
+      :accuse (str (pro (:user event)) " made an accusation: " (card-str (:cards event)) ". "
+                   (if (:correct? event)
+                     "Correct!"
+                     "Wrong!"))
+      (pr-str event))))

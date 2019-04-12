@@ -25,6 +25,7 @@
    :game/suggestions [:db.type/ref :db.cardinality/many :db/isComponent]
    :game/face-up-cards [:db.type/keyword :db.cardinality/many]
    :game/roll [:db.type/long]
+   :game/log [:db.type/string :db.cardinality/many]
 
    :player/name [:db.type/string :db.unique/identity]
    :player/character [:db.type/keyword]

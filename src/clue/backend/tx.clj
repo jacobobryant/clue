@@ -71,12 +71,17 @@
 
 (defn roll [db username]
   ; replace with ai instead of deleting whole game
-  (let [game-id (q/game-id db username :game.state/start-turn)]
+  (let [game-id (q/game-id db username :game.state/start-turn)
+        roll (core/roll-dice)]
     (assert (some? game-id))
     (assert (= username (q/current-player db game-id)))
     [{:game/id game-id
-      :game/roll (core/roll-dice)
-      :game/state :game.state/post-roll}]))
+      :game/roll roll
+      :game/state :game.state/post-roll
+      :game/log [(pr-str {:turn (q/turn db game-id)
+                          :event :roll
+                          :user username
+                          :roll roll})]}]))
 
 (defn move [db username destination]
   (let [source (q/location db username)
@@ -89,7 +94,11 @@
                      :game.state/make-suggestion)]
     (assert (core/valid-move?' source destination roll))
     [{:game/id game-id
-      :game/state next-state}
+      :game/state next-state
+      :game/log [(pr-str {:turn (q/turn db game-id)
+                          :event :move
+                          :user username
+                          :destination destination})]}
      {:player/name username
       :player/location (pr-str destination)}]))
 
@@ -116,7 +125,11 @@
                           {:suggestion/suggester username
                            :suggestion/cards solution}
                           :suggestion/responder responder)
-      :game/state next-state}]))
+      :game/state next-state
+      :game/log [(pr-str {:turn (q/turn db game-id)
+                          :event :suggest
+                          :user username
+                          :cards solution})]}]))
 
 (defn show-card [db username card]
   (let [game-id (q/game-id db username)
@@ -127,7 +140,12 @@
     [{:db/id suggestion-eid
       :suggestion/response card}
      {:game/id game-id
-      :game/state :game.state/accuse}]))
+      :game/state :game.state/accuse
+      :game/log [(pr-str {:turn turn
+                          :event :show-card
+                          :suggester (q/current-player db game-id)
+                          :responder username
+                          :card card})]}]))
 
 (defn end-turn [db username]
   (let [game-id (q/game-id db username)
@@ -149,5 +167,10 @@
       :player/accusation cards}
      (cond->
        {:game/id game-id
-        :game/state (if game-over? :game.state/done :game.state/start-turn)}
+        :game/state (if game-over? :game.state/done :game.state/start-turn)
+        :game/log [(pr-str {:turn turn
+                            :event :accuse
+                            :user username
+                            :cards cards
+                            :correct? correct?})]}
        (not game-over?) (assoc :game/turn (inc turn)))]))

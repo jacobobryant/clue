@@ -90,22 +90,20 @@
 (defn move []
   (let [coordinates (reagent.core/atom "")]
     (fn []
-      [rc/v-box
-       [rc/p "You rolled a " @db/roll]
-       [rc/h-box
-        [rc/label :label "Coordinates:"]
-        [rc/input-text
-         :model coordinates
-         :transform lower-case]]
+      [rc/h-box
+       [rc/label :label "Coordinates:"]
+       [rc/input-text
+        :model coordinates
+        :transform lower-case]
        [rc/button
         :label "Move"
         :on-click #(event/move! (info/parse-coordinates @coordinates))]])))
 
 (defn select-cards [{:keys [all?]} model]
-  (reset! model [nil nil nil])
   (let [info (cond-> [[info/sorted-characters "Person"]
                       [info/weapons-vec "Weapon"]]
                all? (conj [info/rooms-vec "Room"]))
+        _ (reset! model (vec (repeat (count info) nil)))
         dropdowns (u/forv [[i [choices placeholder]] (u/zip [(range) info])]
                     [rc/single-dropdown
                      :model (reaction (nth @model i))
@@ -120,14 +118,12 @@
 (defn suggest []
   (let [cards (r/atom nil)]
     (fn []
-      [rc/v-box
-       [rc/p "Make a suggestion:"]
-       [rc/h-box
-        [select-cards {:all? false} cards]
-        [rc/button
-         :label "Make suggestion"
-         :disabled? (some nil? @cards)
-         :on-click #(apply event/suggest! @cards)]]])))
+      [rc/h-box
+       [select-cards {:all? false} cards]
+       [rc/button
+        :label "Make suggestion"
+        :disabled? (some nil? @cards)
+        :on-click #(apply event/suggest! @cards)]])))
 
 (defn select-card []
   (let [choices @db/possible-responses
@@ -204,16 +200,39 @@
    [:p (with-out-str (human/print-rooms))]
    [:p "Your hand: " (join ", " (map info/card-names @db/hand))]])
 
+(defn event-log []
+  (let [username @db/username]
+    [rc/scroller
+     :v-scroll :auto
+     :h-scroll :spill
+     :height "500px"
+     :max-width "315px"
+     :child [rc/v-box
+             (for [[i e] (u/indexed @db/events)]
+               ^{:key [(= i 0) (:turn e) (:event e)]}
+               [rc/p {:style (cond-> {:font-size "14px"
+                                      :width "300px"
+                                      :min-width "300px"}
+                               (= i 0) (assoc :font-weight "bold"))}
+                (info/event-text e username)])]]))
+
 (defn board []
-  [:pre {:style {:background-color "black"
-                 :color "white"}}
-   (with-out-str
-     (human/print-game-board (human/current-board @db/player-locations)))])
+  (let [username @db/username]
+    [rc/h-box
+     [:pre {:style {:background-color "black"
+                    :color "white"
+                    :min-width "53ch"
+                    :max-width "53ch"
+                    :width "53ch"
+                    }}
+      (with-out-str
+        (human/print-game-board (human/current-board @db/player-locations)))]
+     [event-log]]))
 
 (defn ongoing-game []
   [rc/v-box
    [rc/title
-    :label (str "Game ID: " @db/game-id)
+    :label (str "Game ID: " @db/game-id ". You are " @db/character ".")
     :level :level2]
    [turn-controls]
    [board]
@@ -226,7 +245,7 @@
   [:div {:style {:height "100%"
                  :background-color color/site-background}}
    [header]
-   [rc/v-box {:width "700px" :margin "0 auto"}
+   [rc/v-box {:width "820px" :margin "0 auto"}
     [rc/gap :size "10px"]
     (cond
       (not @db/loaded?) [rc/throbber

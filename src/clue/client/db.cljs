@@ -22,6 +22,7 @@
                                      (map (juxt :player/character :player/location))
                                      (into {}))))
 (def player-data (reaction (first (filter #(= (:player/name %) @username) (vals @all-player-data)))))
+(def character (reaction (info/card-names (:player/character @player-data))))
 (def hand (reaction (:player/hand @player-data)))
 ; do face up cards
 (def player-characters (reaction (->> (vals @all-player-data)
@@ -46,3 +47,7 @@
                                   (filter #(= (:player/accusation %) (:game/solution @game)))
                                   first :player/name)))
 (def winner (reaction (:game/winner @game)))
+(def unsorted-events (reaction (:game/log @game)))
+(def events (reaction (->> @unsorted-events
+                           (sort-by (fn [e] [(:turn e) (info/event-order (:event e))]))
+                           reverse)))

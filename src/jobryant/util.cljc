@@ -50,6 +50,9 @@
 
 ))
 
+(defn indexed [xs]
+  (map-indexed vector xs))
+
 (defn map-from
   [f xs]
   (into {} (for [x xs] [x (f x)])))

@@ -51,6 +51,7 @@
 (defn broadcast-state! [db usernames]
   (let [new-games (delay (q/new-games db))]
     (doseq [uid usernames]
+      (u/capture db usernames new-games uid)
       (let [game (q/game db uid)
             payload (conj {:username uid}
                           (if game
