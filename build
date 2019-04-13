@@ -2,13 +2,18 @@
 cmd="$1"
 shift
 case "$cmd" in
-  play)
-    clj -m clue.play "$@"
-    ;;
   repl)
-    clj -e "(do (doto 'clue.repl require in-ns) (nrepl) (go))" -r
+    clj -A:dev -e "(do (doto 'clue.repl require in-ns) (nrepl) (go))" -r
     ;;
   fig)
-    clj -m figwheel.main -b dev -r
+    clj -A:dev -m figwheel.main -b dev -r
+    ;;
+  push)
+    clj -A:prod -m cljs.main -co prod.cljs.edn -c clue.client.core
+    rsync -PRLr --delete src resources env/prod target/cljs-prod/public/js/main.js deps.edn build \
+        jacobobryant.com:clue/
+    ;;
+  prod-repl)
+    clj -A:prod -e "(do (doto 'clue.repl require in-ns) (go))" -r
     ;;
 esac

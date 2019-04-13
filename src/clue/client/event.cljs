@@ -3,7 +3,8 @@
             [clue.client.db :as db :refer [db]]))
 
 (defn init! []
-  (send! [:clue/init nil]))
+  (send! [:clue/init nil])
+  (js/setTimeout #(when (not @db/loaded?) (init!)) 1000))
 
 (defn new-game! []
   (send! [:clue/new-game nil]))

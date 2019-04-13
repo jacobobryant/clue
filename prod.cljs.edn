@@ -1,0 +1,5 @@
+{:optimizations :advanced,
+ :infer-externs true,
+ :output-to "target/cljs-prod/public/js/main.js",
+ :output-dir "target/cljs-prod/public/js/main",
+ :asset-path "js/main"}
