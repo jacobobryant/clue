@@ -97,7 +97,7 @@
    :peacock "blue"
    :green "darkgreen"
    :white "white"
-   :mustard "yellow"
+   :mustard "#ffdb58"
    :scarlet "red"})
 
 (def room-tiles
@@ -135,7 +135,8 @@
       :roll (str (pro (:user event)) " rolled a " (:roll event) ".")
       :move (str (pro (:user event)) " moved"
                  (some->> event :destination rooms-map card-names (str " to ")) ".")
-      :suggest (str (pro (:user event)) " suggested " (card-str (:cards event)) ".")
+      :suggest (str (pro (:user event)) " suggested " (card-str (:cards event)) "."
+                    (when (not (:response? event)) " No response."))
       :show-card (str (pro (:responder event))
                       " showed "
                       (if (contains? #{(:suggester event) (:responder event)} username)

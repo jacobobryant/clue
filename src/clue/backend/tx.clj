@@ -129,7 +129,8 @@
       :game/log [(pr-str {:turn (q/turn db game-id)
                           :event :suggest
                           :user username
-                          :cards solution})]}]))
+                          :cards solution
+                          :response? (some? responder)})]}]))
 
 (defn show-card [db username card]
   (let [game-id (q/game-id db username)

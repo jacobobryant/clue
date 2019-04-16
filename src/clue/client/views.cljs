@@ -135,10 +135,7 @@
 
 (defn show-card []
   (if (= @db/responder @db/username)
-    [rc/v-box
-     [rc/p @db/suggester " suggested "
-      (join ", " (map info/card-names @db/suggested-cards)) "."]
-     [select-card]]
+    [select-card]
     [rc/p "Waiting for " @db/responder " to show "
      (if (= @db/username @db/current-player) "you" @db/current-player)
      " a card."]))
@@ -166,20 +163,21 @@
           :on-click #(reset! accusing? true)]]))))
 
 (defn turn-controls []
-  (cond
-    @db/game-done? [rc/p (if (= @db/username @db/winner)
-                           "You are"
-                           (str @db/winner " is"))
-                         " the winner."]
-    (some? @db/responder) [show-card]
-    @db/your-turn? (case @db/game-state
-                     :game.state/start-turn [rc/button
-                                             :label "Roll dice"
-                                             :on-click event/roll!]
-                     :game.state/post-roll [rc/label :label "Choose a destination."]
-                     :game.state/make-suggestion [suggest]
-                     :game.state/accuse [accuse])
-    :default [rc/p "It's " @db/current-player "'s turn."]))
+  [:div {:style {:height "40px"}}
+   (cond
+     @db/game-done? [rc/p (if (= @db/username @db/winner)
+                            "You are"
+                            (str @db/winner " is"))
+                     " the winner."]
+     (some? @db/responder) [show-card]
+     @db/your-turn? (case @db/game-state
+                      :game.state/start-turn [rc/button
+                                              :label "Roll dice"
+                                              :on-click event/roll!]
+                      :game.state/post-roll [rc/label :label "Choose a destination."]
+                      :game.state/make-suggestion [suggest]
+                      :game.state/accuse [accuse])
+     :default [rc/p "It's " @db/current-player "'s turn."])])
 
 (defn static-info []
   [rc/v-box
