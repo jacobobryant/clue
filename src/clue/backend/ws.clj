@@ -7,7 +7,8 @@
             [jobryant.datomic.api :as d]
             [jobryant.datomic.util :as du]
             [clue.backend.query :as q]
-            [clue.db :as db :refer [conn]]))
+            [clue.db :as db :refer [conn]]
+            [clue.backend.ai :as ai]))
 
 (defn username [event]
   (or (get-in event [:ring-req :session :uid])
@@ -49,10 +50,12 @@
 ; To improve performance, we could have a separate function for updating a game
 ; that only includes the information that can change.
 (defn broadcast-state! [db usernames]
+  (u/capture db usernames)
   (let [new-games (delay (q/new-games db))]
     (doseq [uid usernames]
       (u/capture db usernames new-games uid)
       (let [game (q/game db uid)
+            _ (u/capture game)
             payload (conj {:username uid}
                           (if game
                             [:game game]
@@ -75,7 +78,7 @@
         {:keys [db-after db-before]} @(d/transact conn [[:clue.backend.tx/leave-game _username]])
         game-id (q/game-id db-before _username)
         lobby-uids (q/in-lobby db-before (:any @*connected-uids))
-        game-uids (q/players db-after game-id)
+        game-uids (q/humans db-after game-id)
         uids (concat [_username] game-uids lobby-uids)]
     (broadcast-state! db-after uids)))
 
@@ -84,7 +87,7 @@
         {:keys [db-after db-before]}
         @(d/transact conn [[:clue.backend.tx/join-game _username game-id]])
         lobby-uids (q/in-lobby db-after (:any @*connected-uids))
-        game-uids (q/players db-before game-id)
+        game-uids (q/humans db-before game-id)
         uids (concat [_username] game-uids lobby-uids)]
     (broadcast-state! db-after uids)))
 
@@ -92,7 +95,8 @@
   (let [_username (username event)
         {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/start-game _username]])
         players (q/players-from-username db-after _username)]
-    (broadcast-state! db-after players)))
+    (broadcast-state! db-after players)
+    (ai/do-something-maybe db-after _username handler)))
 
 (defmethod handler :clue/quit-game [event]
   (let [_username (username event)
@@ -104,36 +108,78 @@
   (let [_username (username event)
         {:keys [db-before db-after]} @(d/transact conn [[:clue.backend.tx/roll _username]])
         players (q/players-from-username db-before _username)]
-    (broadcast-state! db-after players)))
+    (broadcast-state! db-after players)
+    (ai/do-something-maybe db-after _username handler)))
 
 (defmethod handler :clue/move [{coordinates :?data :as event}]
   (let [_username (username event)
         coordinates (u/pred-> coordinates string? first)
         {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/move _username coordinates]])
         players (q/players-from-username db-after _username)]
-    (broadcast-state! db-after players)))
+    (broadcast-state! db-after players)
+    (ai/do-something-maybe db-after _username handler)))
 
 (defmethod handler :clue/suggest [{[person weapon] :?data :as event}]
   (let [_username (username event)
         {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/suggest _username person weapon]])
         players (q/players-from-username db-after _username)]
-    (broadcast-state! db-after players)))
+    (broadcast-state! db-after players)
+    (ai/do-something-maybe db-after _username handler)))
 
 (defmethod handler :clue/show-card [{card :?data :as event}]
   (let [_username (username event)
         {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/show-card _username card]])
         players (q/players-from-username db-after _username)]
-    (broadcast-state! db-after players)))
+    (broadcast-state! db-after players)
+    (ai/do-something-maybe db-after _username handler)))
 
 (defmethod handler :clue/end-turn [event]
   (let [_username (username event)
         {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/end-turn _username]])
         players (q/players-from-username db-after _username)]
-    (broadcast-state! db-after players)))
+    (broadcast-state! db-after players)
+    (ai/do-something-maybe db-after _username handler)))
 
 (defmethod handler :clue/accuse [{cards :?data :as event}]
   (assert (= (count cards) 3))
   (let [_username (username event)
         {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/accuse _username cards]])
         players (q/players-from-username db-after _username)]
-    (broadcast-state! db-after players)))
+    (broadcast-state! db-after players)
+    (ai/do-something-maybe db-after _username handler)))
+
+(defmethod handler :clue/add-ai [event]
+  (let [_username (username event)
+        {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/add-ai _username]])
+        lobby-uids (q/in-lobby db-after (:any @*connected-uids))
+        game-uids (q/players-from-username db-after _username)
+        uids (concat game-uids lobby-uids)]
+    (broadcast-state! db-after uids)))
+
+(defmethod handler :clue/remove-ai [event]
+  (let [_username (username event)
+        {:keys [db-after]} @(d/transact conn [[:clue.backend.tx/remove-ai _username]])
+        lobby-uids (q/in-lobby db-after (:any @*connected-uids))
+        game-uids (q/players-from-username db-after _username)
+        uids (concat game-uids lobby-uids)]
+    (broadcast-state! db-after uids)))
+
+(defmethod handler :clue/observe [event]
+  (let [_username (username event)
+        {:keys [db-after db-before]}
+        @(d/transact conn [[:clue.backend.tx/observe _username]])
+        lobby-uids (q/in-lobby db-after (:any @*connected-uids))
+        game-id (q/game-id db-after _username)
+        game-uids (q/humans db-before game-id)
+        uids (concat [_username] game-uids lobby-uids)]
+    (broadcast-state! db-after uids)))
+
+(defmethod handler :clue/rejoin [event]
+  (let [_username (username event)
+        {:keys [db-after db-before]}
+        @(d/transact conn [[:clue.backend.tx/rejoin _username]])
+        lobby-uids (q/in-lobby db-after (:any @*connected-uids))
+        game-id (q/game-id db-after _username)
+        game-uids (q/humans db-before game-id)
+        uids (concat [_username] game-uids lobby-uids)]
+    (broadcast-state! db-after uids)))

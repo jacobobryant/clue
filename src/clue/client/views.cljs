@@ -47,12 +47,28 @@
    [rc/title
     :label (str "Game ID: " @db/game-id)
     :level :level2]
-   [rc/p [:strong "Players: "] (clojure.string/join ", " @db/players)]
+   [rc/p [:strong "Players: "] (join ", " @db/players)]
    [rc/h-box
     [rc/button
      :label "Start game"
      :on-click event/start-game!
      :disabled? (not @db/can-start-game?)]
+    [rc/button
+     :label "Add AI player"
+     :on-click event/add-ai!
+     :disabled? (not @db/can-add-ai?)]
+    [rc/button
+     :label "Remove AI player"
+     :on-click event/remove-ai!
+     :disabled? (not @db/can-remove-ai?)]
+    #_(if @db/observer?
+      [rc/button
+       :label "Become participant"
+       :on-click event/rejoin!
+       :disabled? (not @db/can-add-ai?)]
+      [rc/button
+       :label "Become observer"
+       :on-click event/observe!])
     [rc/button
      :label "Leave game"
      :on-click event/leave-game!]]])
@@ -76,9 +92,9 @@
    (if @db/have-new-games?
      [table
       ["ID" "Players" ""]
-      (for [game @db/new-games]
+      (u/forv [game @db/new-games]
         [(:game/id game)
-         (join ", " (:game/players game))
+         (join ", " @db/players)
          [rc/button
           :label "Join"
           :on-click #(event/join-game! (:game/id game))]])]
@@ -282,7 +298,8 @@
 (defn ongoing-game []
   [rc/v-box
    [rc/title
-    :label (str "Game ID: " @db/game-id ". You are " @db/character ".")
+    :label (str "Game ID: " @db/game-id "." (when (some? @db/character)
+                                              (str " You are " @db/character ".")))
     :level :level2]
    [turn-controls]
    [board]

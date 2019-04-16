@@ -10,6 +10,7 @@
 (def schema
   {:game/id [:db.type/string :db.unique/identity]
    :game/players [:db.type/string :db.cardinality/many]
+   :game/ais [:db.type/string :db.cardinality/many]
    :game/state [:db.type/ref]
    :game.state/new []
    :game.state/start-turn []
@@ -26,12 +27,14 @@
    :game/face-up-cards [:db.type/keyword :db.cardinality/many]
    :game/roll [:db.type/long]
    :game/log [:db.type/string :db.cardinality/many]
+   :game/observers [:db.type/string :db.cardinality/many]
 
    :player/name [:db.type/string :db.unique/identity]
    :player/character [:db.type/keyword]
    :player/location [:db.type/string]
    :player/hand [:db.type/keyword :db.cardinality/many]
    :player/accusation [:db.type/keyword :db.cardinality/many]
+   :player/ai-data [:db.type/string]
 
    :suggestion/suggester [:db.type/string]
    :suggestion/cards [:db.type/keyword :db.cardinality/many]

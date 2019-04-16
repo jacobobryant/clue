@@ -3,6 +3,7 @@
             [clue.backend.query :as q]
             [clue.info :as info]
             [clue.core :as core]
+            [clue.backend.ai :as ai]
             [jobryant.util :as u]))
 
 ; add datomic rule predicates + convenient system for saying "this set of
@@ -30,15 +31,12 @@
 
 (defn join-game [db username game-id]
   (assert (= :game.state/new (q/game-state db game-id)))
+  (assert (<= (q/num-players db game-id) 5))
   [{:game/id game-id
     :game/players [username]}])
 
 (defn start-game [db username]
-  (let [game-id (d/q '[:find ?game-id . :in $ ?username :where
-                       [?game :game/players ?username]
-                       [?game :game/state :game.state/new]
-                       [?game :game/id ?game-id]]
-                     db username)
+  (let [game-id (q/game-id db username :game.state/new)
         _ (assert (some? game-id))
         players (q/players db game-id)
         _ (assert (<= 2 (count players) 6))
@@ -57,10 +55,13 @@
       :game/solution solution
       :game/face-up-cards face-up-cards
       :game/player-data (for [[player character hand] player-data]
-                          {:player/name player
-                           :player/character character
-                           :player/hand hand
-                           :player/location (pr-str (core/starting-location character))})}]))
+                          (cond->
+                            {:player/name player
+                             :player/character character
+                             :player/hand hand
+                             :player/location (pr-str (core/starting-location character))}
+                            (q/ai? db game-id player)
+                            (assoc :player/ai-data (pr-str (ai/init-data hand players player)))))}]))
 
 (defn quit-game [db username]
   ; replace with ai instead of deleting whole game
@@ -174,3 +175,31 @@
                             :cards cards
                             :correct? correct?})]}
        (not game-over?) (assoc :game/turn (inc turn)))]))
+
+(defn add-ai [db username]
+  (println "adding ai")
+  (u/capture db username)
+  (let [game-id (q/game-id db username :game.state/new)]
+    (assert (some? game-id))
+    (assert (<= (q/num-players db game-id) 5))
+    [{:game/id game-id
+      :game/ais [(str "AI " (inc (q/num-ais db game-id)))]}]))
+
+(defn remove-ai [db username]
+  (let [game-id (q/game-id db username :game.state/new)]
+    (assert (some? game-id))
+    (assert (< 0 (q/num-ais db game-id)))
+    [[:db/retract [:game/id game-id] :game/ais (str "AI " (q/num-ais db game-id))]]))
+
+(defn observe [db username]
+  (let [game-id (q/game-id db username :game.state/new)]
+    (assert (some? game-id))
+    [[:db/retract [:game/id game-id] :game/players username]
+     [:db/add [:game/id game-id] :game/observers username]]))
+
+(defn rejoin [db username]
+  (let [game-id (q/game-id db username :game.state/new)]
+    (assert (some? game-id))
+    (assert (<= (q/num-players db game-id) 5))
+    [[:db/add [:game/id game-id] :game/players username]
+     [:db/retract [:game/id game-id] :game/observers username]]))

@@ -38,3 +38,15 @@
 
 (defn accuse! [cards]
   (send! [:clue/accuse cards]))
+
+(defn add-ai! []
+  (send! [:clue/add-ai nil]))
+
+(defn remove-ai! []
+  (send! [:clue/remove-ai nil]))
+
+(defn observe! []
+  (send! [:clue/observe nil]))
+
+(defn rejoin! []
+  (send! [:clue/rejoin nil]))

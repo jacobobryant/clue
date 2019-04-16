@@ -150,3 +150,10 @@
                      "Correct!"
                      "Wrong!"))
       (pr-str event))))
+
+(defn rotate-characters [characters character]
+  (->> sorted-characters
+       (filter characters)
+       repeat
+       (mapcat (fn [f cs] (f #(not= % character) cs)) [drop-while take-while])
+       rest))
