@@ -1,6 +1,7 @@
 (ns clue.info
   (:require [clojure.string :as str]
-            [jobryant.util :as u]))
+            [jobryant.util :as u]
+            [clojure.set :refer [map-invert]]))
 
 (def sorted-characters [:scarlet :mustard :peacock :green :plum :white])
 (def characters (set sorted-characters))
@@ -72,24 +73,48 @@
    :billiard-room "Billiard room"
    :library "Library"})
 
+(def door-directions
+  {[4 6] :horizontal
+   [4 9] :vertical
+   [7 11] :horizontal
+   [7 12] :horizontal
+   [6 17] :horizontal
+   [9 17] :horizontal
+   [12 16] :vertical
+   [18 19] :horizontal
+   [19 16] :vertical
+   [17 14] :horizontal
+   [17 9] :horizontal
+   [19 8] :vertical
+   [19 5] :vertical
+   [15 6] :vertical
+   [12 1] :horizontal
+   [11 3] :horizontal
+   [8 7] :vertical})
+
+(def player-colors
+  {:plum "purple"
+   :peacock "blue"
+   :green "darkgreen"
+   :white "white"
+   :mustard "yellow"
+   :scarlet "red"})
+
+(def room-tiles
+  {:study [0 0 7 4]
+   :hall [0 9 6 7]
+   :lounge [0 17 7 6]
+   :dining-room [9 16 8 7]
+   :kitchen [18 18 6 7]
+   :ballroom [17 8 8 6]
+   :conservatory [19 0 6 6]
+   :billiard-room [12 0 6 5]
+   :library [6 0 7 5]})
+
 (def rooms-map
   (into {} (map vector (map #(char (+ 48 %)) (range 10)) rooms-vec)))
 
-(defn parse-coordinates [s]
-  (let [[_ _ room coordinate] (re-matches #"((\d)|([a-z]\d+))" s)]
-    (cond
-      room (first s)
-      coordinate (let [col (- (u/ord (first s)) (u/ord \a))
-                       row (dec (u/parse-int (subs s 1)))]
-                   [row col]))))
-
-(defn coordinate-text [coord]
-  (if (vector? coord)
-    (let [[row col] coord]
-      (str
-        (char (+ col (u/ord \a)))
-        (inc row)))
-    (card-names (rooms-map coord))))
+(def rooms-map-invert (map-invert rooms-map))
 
 (defn pronoun
   ([user you {:keys [capitalize?] :or {capitalize? false}}]
@@ -108,7 +133,8 @@
   (let [pro #(pronoun % username {:capitalize? true})]
     (case (:event event)
       :roll (str (pro (:user event)) " rolled a " (:roll event) ".")
-      :move (str (pro (:user event)) " moved to " (coordinate-text (:destination event)) ".")
+      :move (str (pro (:user event)) " moved"
+                 (some->> event :destination rooms-map card-names (str " to ")) ".")
       :suggest (str (pro (:user event)) " suggested " (card-str (:cards event)) ".")
       :show-card (str (pro (:responder event))
                       " showed "
@@ -116,7 +142,8 @@
                         (card-names (:card event))
                         "a card")
                       " to "
-                      (pronoun (:suggester event) username))
+                      (pronoun (:suggester event) username)
+                      ".")
       :accuse (str (pro (:user event)) " made an accusation: " (card-str (:cards event)) ". "
                    (if (:correct? event)
                      "Correct!"

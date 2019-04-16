@@ -2,7 +2,9 @@
   (:require [reagent.core :as r]
             [reagent.ratom :refer-macros [reaction]]
             [clojure.pprint :refer [pprint]]
-            [clue.info :as info]))
+            [clojure.set :refer [map-invert]]
+            [clue.info :as info]
+            [clue.core :as core]))
 
 (defonce db (r/atom nil))
 (def username (reaction (:username @db)))
@@ -21,6 +23,7 @@
 (def player-locations (reaction (->> (vals @all-player-data)
                                      (map (juxt :player/character :player/location))
                                      (into {}))))
+(def location-players (reaction (map-invert @player-locations)))
 (def player-data (reaction (first (filter #(= (:player/name %) @username) (vals @all-player-data)))))
 (def character (reaction (info/card-names (:player/character @player-data))))
 (def hand (reaction (:player/hand @player-data)))
@@ -51,3 +54,8 @@
 (def events (reaction (->> @unsorted-events
                            (sort-by (fn [e] [(:turn e) (info/event-order (:event e))]))
                            reverse)))
+(def current-location (reaction (@player-locations @current-character)))
+(def available-locations (reaction (when @post-roll?
+                                     (->> (core/available-locations @current-location @roll)
+                                        (map #(cond-> % (string? %) info/rooms-map))
+                                        (into #{})))))

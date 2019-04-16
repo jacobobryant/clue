@@ -28,6 +28,12 @@
   (into {} (map-indexed (fn [i p] [p (room-idx-coordinate [room i])])
                         players)))
 
+(defn player-coordinates [player-locations]
+  (let [[player-coordinate player-room]
+        (u/split-by #(s/valid? ::c/coordinate (second %)) player-locations)]
+    (concat player-coordinate
+            (mapcat player-coordinates-for (u/map-inverse player-room)))))
+
 (defn-spec current-board ::c/board
   [player-locations ::t/player-locations]
   (let [[player-coordinate player-room]

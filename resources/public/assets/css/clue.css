@@ -1,3 +1,12 @@
 html, body {
   font-size: 16px;
+  background-color: #f4f4f4;
+}
+
+.available-room:hover {
+  background-color: #bbb;
+}
+
+.available-square:hover {
+  background-color: rgb(173, 91, 3) !important;
 }

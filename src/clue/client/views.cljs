@@ -8,6 +8,7 @@
             [clue.client.event :as event]
             [clue.human :as human]
             [clue.info :as info]
+            [clue.core :as core]
             [clojure.string :refer [join lower-case]]))
 
 (defn header-title [label level]
@@ -86,18 +87,6 @@
     [rc/button
      :label "Create game"
      :on-click event/new-game!]]])
-
-(defn move []
-  (let [coordinates (reagent.core/atom "")]
-    (fn []
-      [rc/h-box
-       [rc/label :label "Coordinates:"]
-       [rc/input-text
-        :model coordinates
-        :transform lower-case]
-       [rc/button
-        :label "Move"
-        :on-click #(event/move! (info/parse-coordinates @coordinates))]])))
 
 (defn select-cards [{:keys [all?]} model]
   (let [info (cond-> [[info/sorted-characters "Person"]
@@ -187,18 +176,17 @@
                      :game.state/start-turn [rc/button
                                              :label "Roll dice"
                                              :on-click event/roll!]
-                     :game.state/post-roll [move]
+                     :game.state/post-roll [rc/label :label "Choose a destination."]
                      :game.state/make-suggestion [suggest]
                      :game.state/accuse [accuse])
     :default [rc/p "It's " @db/current-player "'s turn."]))
 
 (defn static-info []
   [rc/v-box
+   [:p "Your hand: " (join ", " (map info/card-names @db/hand))]
    [:p "Players: " (join ", "
                          (for [[player character] @db/player-characters]
-                           (str player " (" (info/card-names character) ")")))]
-   [:p (with-out-str (human/print-rooms))]
-   [:p "Your hand: " (join ", " (map info/card-names @db/hand))]])
+                           (str player " (" (info/card-names character) ")")))]])
 
 (defn event-log []
   (let [username @db/username]
@@ -216,17 +204,81 @@
                                (= i 0) (assoc :font-weight "bold"))}
                 (info/event-text e username)])]]))
 
+(def square-size 22)
+
+(defn board-element [row col width height z]
+  {:position "absolute"
+   :top (int (* square-size row))
+   :left (int (* square-size col))
+   :width (int (* square-size width))
+   :height (int (* square-size height))
+   :z-index z})
+
 (defn board []
-  (let [username @db/username]
+  (let [available-locations @db/available-locations
+        moving? (and @db/your-turn? @db/post-roll?)]
     [rc/h-box
-     [:pre {:style {:background-color "black"
-                    :color "white"
-                    :min-width "53ch"
-                    :max-width "53ch"
-                    :width "53ch"
-                    }}
-      (with-out-str
-        (human/print-game-board (human/current-board @db/player-locations)))]
+     [:div {:style {:position "relative"
+                    :width (* square-size core/board-width)
+                    :height (* square-size 25)}}
+
+      ; Rooms
+      (for [[room [row col width height]] info/room-tiles
+            :let [available? (contains? available-locations room)
+                  can-move? (and available? moving?)]]
+        ^{:key room}
+        [:div {:class (when can-move? "available-room")
+               :style (merge (board-element row col width height 1)
+                             {:text-align "center"})
+               :on-click (when can-move? #(event/move! (info/rooms-map-invert room)))}
+         [rc/label
+          :label (info/card-names room)
+          :style (cond-> {}
+                   (= :conservatory room) (assoc :margin-left "-20px")
+                   available? (assoc :font-weight "bold"))]])
+
+      ; Squares
+      (for [[row col :as loc] (keys core/empty-board)
+            :let [available? (contains? available-locations loc)
+                  can-move? (and available? moving?)
+                  [bottom-border right-border]
+                  (for [i [0 1]
+                        :let [next-loc (update loc i inc)
+                              next-available? (contains? available-locations next-loc)]]
+                    (str "1px solid " (if (or available? next-available?) "black" "#bc9971")))
+                  [top-border left-border]
+                  (for [i [0 1]
+                        :let [prev-loc (update loc i dec)]]
+                    (when (and available? (not (contains? core/empty-board prev-loc)))
+                      "1px solid black"))]]
+        ^{:key loc}
+        [:div {:class (when can-move? :available-square)
+               :style (merge (board-element row col 1 1 2)
+                             {:border-top top-border
+                              :border-left left-border
+                              :border-right right-border
+                              :border-bottom bottom-border
+                              :background-color "#eac8a3"})
+               :on-click (when can-move? #(event/move! loc))}])
+
+      ; Doors
+      (for [[[row col] orientation] info/door-directions]
+        (let [horizontal? (= orientation :horizontal)
+              [width height] (cond-> [0.1 1] horizontal? reverse)
+              style (merge (board-element row col width height 3)
+                           {:background-color "red"})
+              style (update style (if horizontal? :top :left) dec)]
+          ^{:key [row col]}
+          [:div {:style style}]))
+
+      ; Players
+      (for [[player [row col]] (human/player-coordinates @db/player-locations)]
+        (let [style (merge (board-element row col 0.7 0.7 4)
+                           {:margin (int (* square-size 0.15))
+                            :background-color (info/player-colors player)})]
+          ^{:key player}
+          [:div {:style style}]))]
+
      [event-log]]))
 
 (defn ongoing-game []
@@ -242,10 +294,9 @@
     :on-click event/quit!]])
 
 (defn main [nav-state]
-  [:div {:style {:height "100%"
-                 :background-color color/site-background}}
+  [:div
    [header]
-   [rc/v-box {:width "820px" :margin "0 auto"}
+   [rc/v-box {:width "900px" :margin "0 auto"}
     [rc/gap :size "10px"]
     (cond
       (not @db/loaded?) [rc/throbber
