@@ -149,19 +149,18 @@
                           :card card})]}]))
 
 (defn end-turn [db username]
-  (let [game-id (q/game-id db username)
-        turn (q/turn db game-id)]
+  (let [game-id (q/game-id db username)]
     (assert (= :game.state/accuse (q/game-state db game-id)))
     (assert (= username (q/current-player db game-id)))
     [{:game/id game-id
       :game/state :game.state/start-turn
-      :game/turn (inc turn)}]))
+      :game/turn (q/next-turn db game-id)}]))
 
 (defn accuse [db username cards]
   (let [game-id (q/game-id db username)
         turn (q/turn db game-id)
         correct? (q/correct? db game-id cards)
-        game-over? (or correct? (= (q/players-left db game-id) 2))]
+        game-over? (or correct? (= (q/num-players-left db game-id) 2))]
     (assert (= :game.state/accuse (q/game-state db game-id)))
     (assert (= username (q/current-player db game-id)))
     [{:player/name username

@@ -41,7 +41,7 @@
 (defn turn [db game-id]
   (:game/turn (d/pull db [:game/turn] [:game/id game-id])))
 
-(defn current-character [db game-id]
+(defn sorted-characters [db game-id]
   (let [players (players db game-id)
         characters (set (d/q '[:find [?character ...] :in $ ?game :where
                                [?game :game/player-data ?player]
@@ -49,7 +49,10 @@
                              db [:game/id game-id]))
         characters (filter characters info/sorted-characters)
         turn (mod (turn db game-id) (count characters))]
-    (nth characters turn)))
+    (mapcat #(% turn characters) [drop take])))
+
+(defn current-character [db game-id]
+  (first (sorted-characters db game-id)))
 
 (defn current-player
   ([db game-id]
@@ -190,8 +193,25 @@
               [?game :game/solution ?card]]
             db [:game/id game-id] cards)))
 
-(defn players-left [db game-id]
+(defn num-players-left [db game-id]
   (d/q '[:find (count ?player-data) . :in $ ?game :where
          [?game :game/player-data ?player-data]
          (not [?player-data :player/accusation])]
        db [:game/id game-id]))
+
+(defn players-left [db game-id]
+  (set
+    (d/q '[:find [?character ...] :in $ ?game :where
+           [?game :game/player-data ?player-data]
+           (not [?player-data :player/accusation])
+           [?player-data :player/character ?character]]
+         db [:game/id game-id])))
+
+(defn next-turn [db game-id]
+  (let [players-left (players-left db game-id)]
+    (->> (sorted-characters db game-id)
+         rest
+         u/indexed
+         (filter (fn [[_ character]] (contains? players-left character)))
+         ffirst
+         (+ (turn db game-id) 1))))
