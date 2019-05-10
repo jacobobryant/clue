@@ -1,6 +1,6 @@
 # Clue
 
-This is a command-line version of the board game Clue. It includes a simple AI.
+This is a command-line version of the board game Clue. It includes a simple AI. See the webapp branch for a half-baked web version.
 
 ## Usage
 
